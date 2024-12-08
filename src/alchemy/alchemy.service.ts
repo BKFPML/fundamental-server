@@ -8,10 +8,10 @@ export class AlchemyService {
 
     constructor(
         private readonly configService: ConfigService
-      ) {        
+      ) {
         this.apiKey = this.configService.get<string>('ALCHEMY_API_KEY');
       }
-    
+
     public async getTokenMetadata(contractAddress: string): Promise<any> {
 
         const network = 'base';
@@ -44,25 +44,25 @@ export class AlchemyService {
     }
 
     public async getTokenBalances(address: string): Promise<any[]> {
-        
+
         const network = "base"
         const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
-    
+
         const data = {
             jsonrpc: '2.0',
             method: 'alchemy_getTokenBalances',
             params: [address],
             id: 1
         };
-    
+
         try {
             let response = await axios.post(Url, data);
             let balances = response.data.result.tokenBalances;
-            
+
             let answer = [];
-            
+
             for (const balance of balances) {
-                // let metadata = await this.getTokenMetadata(balance.contractAddress); 
+                // let metadata = await this.getTokenMetadata(balance.contractAddress);
                 answer.push({
                     asset: balance.contractAddress,
                     // name: metadata.name,
@@ -70,23 +70,23 @@ export class AlchemyService {
                     value: balance.tokenBalance,
                     // decimal: metadata.decimals
                 });
-                
+
             }
-            
+
 
             return answer;
         } catch (error) {
             console.error('Error fetching token balances:', error);
             throw error;
         }
-        
+
     }
 
     public async getEthBalance(address: string): Promise<string> {
         const network = "base"
         Logger.log(`Fetching balance for address: ${address}`);
-        
-        
+
+
         Logger.log(`API Key: ${this.apiKey}`);
         const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
 
@@ -110,5 +110,36 @@ export class AlchemyService {
             Logger.log(error);
             throw error;
         }
+    }
+
+    async getTokenPriceInEuro(symbols: string): Promise<any> {
+        const symbolsArray = symbols.split('&');
+        const results = [];
+        for (const symbol of symbolsArray) {
+            const Url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbol}`;
+            try {
+                const response = await axios.get(Url);
+                Logger.log('Full response for symbol', symbol, response.data);
+                const tokenData = response.data.data?.[0];
+                if (!tokenData || tokenData.error) {
+                    throw new Error(`Error fetching data for symbol ${symbol}: ${tokenData?.error || 'Unknown error'}`);
+                }
+                const priceInUsd = tokenData.prices.find(price => price.currency === 'usd')?.value;
+                if (!priceInUsd) {
+                    throw new Error(`Price in USD not found for symbol ${symbol}`);
+                }
+                const lastUpdated = tokenData.prices.find(price => price.currency === 'usd')?.lastUpdatedAt;
+                Logger.log(`Price of ${symbol} in USD: ${priceInUsd}`);
+                Logger.log(`Last updated: ${lastUpdated}`);
+                results.push({
+                    symbol,
+                    price: `${priceInUsd} AT ${lastUpdated}`,
+                });
+            } catch (error) {
+                console.error(`Error fetching token price for symbol ${symbol}:`, error);
+                results.push({ symbol, error: error.message });
+            }
+        }
+        return results;
     }
 }

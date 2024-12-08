@@ -9,4 +9,8 @@ export class AlchemyController {
     async getEthBalance(@Param('address') address: string): Promise<string> {
         return this.alchemyService.getEthBalance(address);
     }
+    @Get('token-price-in-euro/:token')
+    async getTokenPriceInEuro(@Param('token') token: string): Promise<any> {
+        return this.alchemyService.getTokenPriceInEuro(token);
+    }
 }
