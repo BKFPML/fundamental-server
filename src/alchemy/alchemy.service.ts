@@ -4,18 +4,20 @@ import { ConfigService } from '@nestjs/config';
 import { log } from 'console';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://kilqtdrtuaxyoxkethsv.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 @Injectable()
 export class AlchemyService {
     private readonly apiKey: string;
+    private readonly supabaseUrl: string;
+    private readonly supabaseKey: string;
+    public supabase: any;
 
     constructor(
         private readonly configService: ConfigService
       ) {
         this.apiKey = this.configService.get<string>('ALCHEMY_API_KEY');
+        this.supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+        this.supabaseKey = this.configService.get<string>('SUPABASE_KEY');
+        this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
       }
 
       public async getTokenMetadata(contractAddress: string): Promise<any> {
@@ -37,24 +39,24 @@ export class AlchemyService {
             }
     
             // Vérification et insertion dans la base Supabase
-            const { data: tokenData, error } = await supabase
+            const { data: tokenData, error } = await this.supabase
                 .from('crypto_list')
                 .select('crypto_name')
                 .eq('crypto_name', metadata.name);
     
             if (error) {
-                Logger.error('Error querying Supabase:', JSON.stringify(error, null, 2));
+                // Logger.error('Error querying Supabase:', JSON.stringify(error, null, 2));
 
             }
             Logger.log("Token Data:", tokenData);
             if (!tokenData || tokenData.length === 0) {
-                const { error: insertError } = await supabase
+                const { error: insertError } = await this.supabase
                     .from('crypto_list')
                     .insert([{ crypto_name: metadata.name, symbol: metadata.symbol, decimal: metadata.decimals }])
                     .select();
     
                 if (insertError) {
-                    Logger.error('Error inserting into Supabase:', insertError);
+                    // Logger.error('Error inserting into Supabase:', insertError);
                 }
             }
     
@@ -87,7 +89,7 @@ export class AlchemyService {
 
             for (const balance of balances) {
                 // Récupération des données depuis Supabase
-                const { data: addressData, error } = await supabase
+                const { data: addressData, error } = await this.supabase
                     .from('adress_data')
                     .select('crypto_name_link, symbol, decimal')
                     .eq('wallet_adress', balance.contractAddress);
@@ -102,7 +104,7 @@ export class AlchemyService {
                     Logger.log("Calling getTokenMetadata");
                     const metadata = await this.getTokenMetadata(balance.contractAddress);
                     balance.tokenBalance = balance.tokenBalance.toString();
-                    const { error: insertError } = await supabase
+                    const { error: insertError } = await this.supabase
                         .from('adress_data')
                         .insert([{
                             wallet_adress: balance.contractAddress,
@@ -113,7 +115,7 @@ export class AlchemyService {
                         .select();
 
                     if (insertError) {
-                        Logger.error('Error inserting into Supabase:', JSON.stringify(insertError, null, 2));
+                        // Logger.error('Error inserting into Supabase:', JSON.stringify(insertError, null, 2));
                     }
 
                     tokenMetadata = metadata;
