@@ -14,10 +14,10 @@ export class AlchemyService {
     constructor(
         private readonly configService: ConfigService
       ) {
-        this.apiKey = this.configService.get<string>('ALCHEMY_API_KEY');
-        this.supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-        this.supabaseKey = this.configService.get<string>('SUPABASE_KEY');
-        this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
+        this.apiKey = this.configService.get<string>('ALCHEMY_API_KEY'); // Récupération de la clé API Alchemy
+        this.supabaseUrl = this.configService.get<string>('SUPABASE_URL'); // Récupération de l'URL Supabase
+        this.supabaseKey = this.configService.get<string>('SUPABASE_KEY'); // Récupération de la clé Supabase
+        this.supabase = createClient(this.supabaseUrl, this.supabaseKey); // Création du client Supabase
       }
 
       public async getTokenMetadata(contractAddress: string): Promise<any> {
@@ -29,37 +29,38 @@ export class AlchemyService {
             params: [contractAddress],
             id: 1,
         };
-    
+
         try {
             const response = await axios.post(Url, data);
             const metadata = response.data.result;
-    
+
             if (!metadata) {
                 throw new Error('Token metadata not found');
             }
-    
-            // Vérification et insertion dans la base Supabase
+
+            // Récupération des données de la table crypto_list de Supabase pour vérifier si le token est déjà enregistré
             const { data: tokenData, error } = await this.supabase
                 .from('crypto_list')
                 .select('crypto_name')
                 .eq('crypto_name', metadata.name);
-    
+
             if (error) {
-                // Logger.error('Error querying Supabase:', JSON.stringify(error, null, 2));
+                Logger.error('Error querying Supabase:', JSON.stringify(error, null, 2));
 
             }
             Logger.log("Token Data:", tokenData);
             if (!tokenData || tokenData.length === 0) {
+                // Insertion des données dans la table crypto_list de Supabase si le token n'est pas déjà enregistré
                 const { error: insertError } = await this.supabase
                     .from('crypto_list')
                     .insert([{ crypto_name: metadata.name, symbol: metadata.symbol, decimal: metadata.decimals }])
                     .select();
-    
+
                 if (insertError) {
-                    // Logger.error('Error inserting into Supabase:', insertError);
+                    Logger.error('Error inserting into Supabase:', insertError);
                 }
             }
-    
+
             return {
                 name: metadata.name || 'Nom indisponible',
                 symbol: metadata.symbol || 'Symbole indisponible',
@@ -70,25 +71,28 @@ export class AlchemyService {
             throw error;
         }
     }
-    
+
     public async getTokenBalances(address: string): Promise<any[]> {
         const network = "base";
+        // Création de l'URL Alchemy
         const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+        // Création de la requête
         const data = {
             jsonrpc: '2.0',
             method: 'alchemy_getTokenBalances',
             params: [address],
             id: 1,
         };
-    
+
         try {
+            // envoi de la requête à Alchemy
             const response = await axios.post(Url, data);
             const balances = response.data.result.tokenBalances;
             Logger.log(balances);
             const answer = [];
 
             for (const balance of balances) {
-                // Récupération des données depuis Supabase
+                // Récupération des données de la table adress_data de Supabase
                 const { data: addressData, error } = await this.supabase
                     .from('adress_data')
                     .select('crypto_name_link, symbol, decimal')
@@ -104,6 +108,7 @@ export class AlchemyService {
                     Logger.log("Calling getTokenMetadata");
                     const metadata = await this.getTokenMetadata(balance.contractAddress);
                     balance.tokenBalance = balance.tokenBalance.toString();
+                    // Insertion des données dans la table adress_data de Supabase si l'adresse n'est pas déjà enregistrée
                     const { error: insertError } = await this.supabase
                         .from('adress_data')
                         .insert([{
@@ -115,12 +120,12 @@ export class AlchemyService {
                         .select();
 
                     if (insertError) {
-                        // Logger.error('Error inserting into Supabase:', JSON.stringify(insertError, null, 2));
+                        Logger.error('Error inserting into Supabase:', JSON.stringify(insertError, null, 2));
                     }
 
                     tokenMetadata = metadata;
                 }
-    
+
                 // Ajout des données au résultat
                 answer.push({
                     asset: balance.contractAddress,
@@ -130,14 +135,13 @@ export class AlchemyService {
                     decimal: tokenMetadata.decimal,
                 });
             }
-    
+
             return answer;
         } catch (error) {
             Logger.error('Error fetching token balances:', error);
             throw error;
         }
     }
-    
 
     public async getEthBalance(address: string): Promise<string> {
 

@@ -13,8 +13,8 @@ export const handler: Handler = async (event) => {
             body: JSON.stringify({ error: 'Address not provided' }),
         };
     }
-    const balance = await alchemyService.getEthBalance(address);
-    if (!balance) {
+    const data = await alchemyService.getEthBalance(address);
+    if (!data) {
         return {
             statusCode: 404,
             body: JSON.stringify({ error: 'Balance not found' }),
@@ -22,6 +22,6 @@ export const handler: Handler = async (event) => {
     }
     return {
         statusCode: 200,
-        body: JSON.stringify({ balance }),
+        body: JSON.stringify({ data }),
     };
 };
