@@ -14,8 +14,8 @@ export const handler: Handler = async (event) => {
             body: JSON.stringify({ error: 'Address not provided' }),
         };
     }
-    // Appel de la méthode getTokenBalances de AlchemyService pour récupérer les données de l'adresse fournie
-    const data = await alchemyService.getTokenBalances(address);
+    // Appel de la méthode updateTokenBalances de AlchemyService pour récupérer les données de l'adresse fournie
+    const data = await alchemyService.updateTokenBalances(address);
     if (!data) {
         return {
             statusCode: 404,

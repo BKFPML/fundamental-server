@@ -11,7 +11,7 @@ export class AlchemyController {
     }
 
     @Get('token-balances/:address')
-    async getTokenBalances(@Param('address') address: string): Promise<any[]> {
-        return this.alchemyService.getTokenBalances(address);
+    async updateTokenBalances(@Param('address') address: string): Promise<any[]> {
+        return this.alchemyService.updateTokenBalances(address);
     }
 }
