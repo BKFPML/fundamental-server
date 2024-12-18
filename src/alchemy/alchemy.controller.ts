@@ -13,4 +13,8 @@ export class AlchemyController {
     async getTokenPriceInEuro(@Param('token') token: string): Promise<any> {
         return this.alchemyService.getTokenPriceInEuro(token);
     }
+    @Get('get-token-history/:token')
+    async getTokenHistory(@Param('token') token: string, @Param('beginDate') beginDate: Date, @Param('endDate') endDate: Date): Promise<any> {
+        return this.alchemyService.getTokenHistoricPrice(token, beginDate, endDate);
+    }
 }

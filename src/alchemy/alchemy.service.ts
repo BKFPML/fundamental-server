@@ -142,4 +142,30 @@ export class AlchemyService {
         }
         return results;
     }
+
+    async getTokenHistoricPrice(symbol: string, beginDate: Date, endDate: Date): Promise<any> {
+        const formattedBeginDate = beginDate.toISOString();
+        const formattedEndDate = endDate.toISOString();
+        const url = `https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`;
+
+        try {
+            const data = {
+                symbol: symbol,
+                from: formattedBeginDate,
+                to: formattedEndDate
+            };
+            const response = await axios.post(url, data);
+            console.log('Full response for symbol', symbol, response.data);
+            return response.data;
+        } catch (error) {
+            if (error.response) {
+                console.error(`API returned an error:`, error.response.data);
+            } else if (error.request) {
+                console.error(`No response received from API:`, error.request);
+            } else {
+                console.error(`Error setting up request:`, error.message);
+            }
+            throw error;
+        }
+    }
 }
