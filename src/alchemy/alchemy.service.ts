@@ -147,22 +147,23 @@ export class AlchemyService {
         const formattedBeginDate = beginDate.toISOString();
         const formattedEndDate = endDate.toISOString();
         const url = `https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`;
-
+        console.log(tokenAddress, network);
         try {
             const data = {
-                symbol: symbol,
                 startTime: formattedBeginDate,
                 endTime: formattedEndDate,
                 interval: interval,
                 address: tokenAddress,
                 network: network
             };
+            console.log(tokenAddress, network);
             const response = await axios.post(url, data);
+            console.log(tokenAddress, network);
             const priceArray = response.data.data.map(data => ({
                 price: data.value,
                 date: data.timestamp,
             }));
-            console.log(priceArray, 'prices found');
+            console.log(priceArray, 'prices found for', symbol);
             return response.data;
         } catch (error) {
             if (error.response) {
