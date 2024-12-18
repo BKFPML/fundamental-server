@@ -143,7 +143,7 @@ export class AlchemyService {
         return results;
     }
 
-    async getTokenHistoricPrice(symbol: string, beginDate: Date, endDate: Date, interval: Number): Promise<any> {
+    async getTokenHistoricPrice(symbol: string, beginDate: Date, endDate: Date, interval: Number, tokenAddress: string, network: string): Promise<any> {
         const formattedBeginDate = beginDate.toISOString();
         const formattedEndDate = endDate.toISOString();
         const url = `https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`;
@@ -154,6 +154,8 @@ export class AlchemyService {
                 startTime: formattedBeginDate,
                 endTime: formattedEndDate,
                 interval: interval,
+                address: tokenAddress,
+                network: network
             };
             const response = await axios.post(url, data);
             const priceArray = response.data.data.map(data => ({
