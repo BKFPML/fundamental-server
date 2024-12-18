@@ -155,9 +155,12 @@ export class AlchemyService {
                 endTime: formattedEndDate,
                 interval: interval,
             };
-            console.log('Payload being sent:', data);
             const response = await axios.post(url, data);
-            console.log('Full response for symbol', symbol, response.data);
+            const priceArray = response.data.data.map(data => ({
+                price: data.value,
+                date: data.timestamp,
+            }));
+            console.log(priceArray, 'prices found');
             return response.data;
         } catch (error) {
             if (error.response) {
