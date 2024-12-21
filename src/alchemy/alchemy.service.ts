@@ -2,145 +2,158 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { log } from 'console';
+import { createClient } from '@supabase/supabase-js';
+
 @Injectable()
 export class AlchemyService {
     private readonly apiKey: string;
+    private readonly supabaseUrl: string;
+    private readonly supabaseKey: string;
+    public supabase: any;
 
     constructor(
         private readonly configService: ConfigService
-      ) {
-        this.apiKey = this.configService.get<string>('ALCHEMY_API_KEY');
-      }
-
-    public async getTokenMetadata(contractAddress: string): Promise<any> {
-
-        const network = 'base';
-        const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
-
-        const data = {
-        jsonrpc: '2.0',
-        method: 'alchemy_getTokenMetadata',
-        params: [contractAddress],
-        id: 1,
-        };
-
-        try {
-        const response = await axios.post(Url, data);
-        const metadata = response.data.result;
-
-        if (metadata) {
-            return {
-            name: metadata.name || 'Nom indisponible',
-            symbol: metadata.symbol || 'Symbole indisponible',
-            decimals: metadata.decimals || 'Decimales indisponibles',
-            };
-        } else {
-            throw new Error('Token metadata not found');
-        }
-        } catch (error) {
-        Logger.error('Error fetching token metadata:', error);
-        throw error;
-        }
+    ) {
+        this.apiKey = this.configService.get<string>('ALCHEMY_API_KEY'); // Récupération de la clé API Alchemy
+        this.supabaseUrl = this.configService.get<string>('SUPABASE_URL'); // Récupération de l'URL Supabase
+        this.supabaseKey = this.configService.get<string>('SUPABASE_KEY'); // Récupération de la clé Supabase
+        this.supabase = createClient(this.supabaseUrl, this.supabaseKey); // Création du client Supabase
     }
 
-    public async getTokenBalances(address: string): Promise<any[]> {
-
-        const network = "base"
-        const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+    public async updateTokenBalances(address: string): Promise<any[]> {
+        const network = "base";
+        const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
 
         const data = {
             jsonrpc: '2.0',
             method: 'alchemy_getTokenBalances',
             params: [address],
+            id: 1,
+        };
+
+        try {
+            // Fetch balances from Alchemy
+            const response = await axios.post(url, data);
+            const balances = response.data.result.tokenBalances;
+
+            // Fetch accepted tokens and convert them to a Map for efficient lookups
+            const { data: acceptedTokens, error } = await this.supabase
+                .from('token_list')
+                .select("address, digits");
+
+            if (error) throw new Error(`Error fetching accepted tokens: ${error.message}`);
+
+            const tokenMap = new Map(acceptedTokens.map(token => [token.address, token.digits]));
+
+            // Process balances
+            const res = balances
+                .filter(balance => tokenMap.has(balance.contractAddress)) // Filter only accepted tokens
+                .map(balance => {
+                    const decimals = tokenMap.get(balance.contractAddress) as number;
+                    const tokenBalance = Number(BigInt(balance.tokenBalance)) / Math.pow(10, decimals);
+
+                    return {
+                        token_address: balance.contractAddress,
+                        balance: tokenBalance,
+                    };
+                });
+
+            // Update balances in the database
+            const { error: updateError } = await this.supabase.from('users').update({ balances: res }).eq('wallet_address', address);
+
+            if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
+
+            return res;
+        } catch (error) {
+            Logger.error('Error fetching or processing token balances:', error.message);
+            throw error;
+        }
+    }
+
+    public async getEthBalance(address: string): Promise<string> {
+
+        const network = "base"
+        const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+        const data = {
+            jsonrpc: "2.0",
+            method: "eth_getBalance",
+            params: [address, "latest"],
             id: 1
         };
 
         try {
-            let response = await axios.post(Url, data);
-            let balances = response.data.result.tokenBalances;
-
-            let answer = [];
-
-            for (const balance of balances) {
-                // let metadata = await this.getTokenMetadata(balance.contractAddress);
-                answer.push({
-                    asset: balance.contractAddress,
-                    // name: metadata.name,
-                    // symbol: metadata.symbol,
-                    value: balance.tokenBalance,
-                    // decimal: metadata.decimals
-                });
-
-            }
-
-
-            return answer;
-        } catch (error) {
-            console.error('Error fetching token balances:', error);
-            throw error;
-        }
-
-    }
-
-    public async getEthBalance(address: string): Promise<string> {
-        const network = "base"
-        Logger.log(`Fetching balance for address: ${address}`);
-
-
-        Logger.log(`API Key: ${this.apiKey}`);
-        const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
-
-        const data = {
-        jsonrpc: "2.0",
-        method: "eth_getBalance",
-        params: [address, "latest"],
-        id: 1
-        };
-
-        try {
             const response = await axios.post(Url, data);
-            Logger.log(response.data);
+
             const weiBalance = response.data.result;
             const ethBalance = parseFloat(weiBalance) / 1e18;
             Logger.log(`Balance for address ${address}: ${weiBalance} WEI`);
             Logger.log(`Balance for address ${address}: ${ethBalance} ETH`);
             return weiBalance;
         } catch (error) {
-
             Logger.log(error);
             throw error;
         }
     }
 
-    async getTokenPriceInEuro(symbols: string): Promise<any> {
-        const symbolsArray = symbols.split('&');
-        const results = [];
-        for (const symbol of symbolsArray) {
-            const Url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbol}`;
-            try {
-                const response = await axios.get(Url);
-                Logger.log('Full response for symbol', symbol, response.data);
-                const tokenData = response.data.data?.[0];
-                if (!tokenData || tokenData.error) {
-                    throw new Error(`Error fetching data for symbol ${symbol}: ${tokenData?.error || 'Unknown error'}`);
+    async getTokenPriceInEuro(): Promise<any> {
+        try {
+
+            // Fetch tokens from the database
+            const { data: tokens, error } = await this.supabase
+                .from('token_list')
+                .select('symbol, value');
+            if (error) throw new Error(`Error fetching tokens: ${error.message}`);
+            if (!tokens || tokens.length === 0) return [];
+
+            // Prepare the symbols query string
+            const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&');
+            const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`;
+
+            // Fetch token prices
+            const response = await axios.get(url, {
+                headers: {
+                    Authorization: `Bearer ${this.apiKey}`,
+                    Accept: 'application/json',
+                },
+            });
+
+            const results = response.data.data;
+
+            // Process each token price and update the database
+            const updates = results.map(async tokenData => {
+
+                // Find the token in the database by symbol previously fetched
+                const token = tokens.find(t => t.symbol === tokenData.symbol);
+                if (!token) return null; // Skip if no matching token found
+
+                // Update the token value with new price and timestamp
+                const updatedValue = [
+                    ...(token.value || []),
+                    { price: tokenData.prices[0].value, date: tokenData.prices[0].lastUpdatedAt },
+                ];
+
+                // Update the token value in the database
+                const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ value: updatedValue })
+                    .eq('symbol', tokenData.symbol);
+
+                if (updateError) {
+                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                 }
-                const priceInUsd = tokenData.prices.find(price => price.currency === 'usd')?.value;
-                if (!priceInUsd) {
-                    throw new Error(`Price in USD not found for symbol ${symbol}`);
-                }
-                const lastUpdated = tokenData.prices.find(price => price.currency === 'usd')?.lastUpdatedAt;
-                Logger.log(`Price of ${symbol} in USD: ${priceInUsd}`);
-                Logger.log(`Last updated: ${lastUpdated}`);
-                results.push({
-                    symbol,
-                    price: `${priceInUsd} AT ${lastUpdated}`,
-                });
-            } catch (error) {
-                console.error(`Error fetching token price for symbol ${symbol}:`, error);
-                results.push({ symbol, error: error.message });
-            }
+
+                return {
+                    price: tokenData.prices[0].value,
+                    date: tokenData.prices[0].lastUpdatedAt,
+                };
+            });
+
+            // Wait for all updates to complete
+            return await Promise.all(updates);
+        } catch (error) {
+            console.error('Error fetching or updating token prices:', error.message);
+            throw error;
         }
-        return results;
     }
 
     async getTokenHistoricPrice(symbol: string, beginDate: Date, endDate: Date, interval: Number, tokenAddress: string, network: string): Promise<any> {
