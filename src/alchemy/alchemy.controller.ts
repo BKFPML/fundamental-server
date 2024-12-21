@@ -17,7 +17,6 @@ export class AlchemyController {
     async getTokenHistory(@Param('tokenAdress') token: string, @Body() body: { beginDate: string; endDate: string; interval: Number; tokenAddress: string; network: string}): Promise<any> {
         const beginDate = new Date(body.beginDate);
         const endDate = new Date(body.endDate);
-        console.log(body.tokenAddress, body.network);
         return this.alchemyService.getTokenHistoricPrice(token, beginDate, endDate, body.interval, body.tokenAddress, body.network);
     }
 }
