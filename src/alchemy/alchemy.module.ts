@@ -8,4 +8,5 @@ import { ConfigModule } from '@nestjs/config';
   providers: [AlchemyService],
   controllers: [AlchemyController],
 })
+
 export class AlchemyModule {}
