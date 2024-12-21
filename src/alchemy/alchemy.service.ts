@@ -156,14 +156,11 @@ export class AlchemyService {
                 address: tokenAddress,
                 network: network
             };
-            console.log(tokenAddress, network);
             const response = await axios.post(url, data);
-            console.log(tokenAddress, network);
             const priceArray = response.data.data.map(data => ({
                 price: data.value,
                 date: data.timestamp,
             }));
-            console.log(priceArray, 'prices found for', symbol);
             return response.data;
         } catch (error) {
             if (error.response) {
