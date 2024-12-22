@@ -16,8 +16,8 @@ export class AlchemyController {
     }
 
     @Get('token-price-in-euro/:token')
-    async getTokenPriceInEuro(): Promise<any> {
-        return this.alchemyService.getTokenPriceInEuro();
+    async getTokenPriceInDollars(): Promise<any> {
+        return this.alchemyService.getTokenPriceInDollars();
     }
 
     @Post('get-token-history/:token')
