@@ -156,34 +156,42 @@ export class AlchemyService {
         }
     }
 
-    async getTokenHistoricPrice(symbol: string, beginDate: Date, endDate: Date, interval: Number, tokenAddress: string, network: string): Promise<any> {
-        const formattedBeginDate = beginDate.toISOString();
-        const formattedEndDate = endDate.toISOString();
+    async getTokenHistoricPrices(tokenAddress: string, startTimes: string[],interval: string): Promise<{ price: number; date: string }[]> {
         const url = `https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`;
-        console.log(tokenAddress, network);
-        try {
+        const results: { price: number; date: string }[] = [];
+        
+        for (const startTime of startTimes) {
+            const beginDate = new Date(startTime);
+            const formattedBeginDate = beginDate.toISOString();
+            const formattedEndDate = new Date().toISOString();
+
             const data = {
                 startTime: formattedBeginDate,
                 endTime: formattedEndDate,
                 interval: interval,
                 address: tokenAddress,
-                network: network
+                network: "base",
             };
-            const response = await axios.post(url, data);
-            const priceArray = response.data.data.map(data => ({
-                price: data.value,
-                date: data.timestamp,
-            }));
-            return response.data;
-        } catch (error) {
-            if (error.response) {
-                console.error(`API returned an error:`, error.response.data);
-            } else if (error.request) {
-                console.error(`No response received from API:`, error.request);
-            } else {
-                console.error(`Error setting up request:`, error.message);
+
+            try {
+                const response = await axios.post(url, data);
+                const priceArray = response.data.data.map((item: any) => ({
+                    price: item.value,
+                    date: item.timestamp,
+                }));
+                results.push(...priceArray);
+            } catch (error) {
+                if (error.response) {
+                    console.error(`API returned an error:`, error.response.data);
+                } else if (error.request) {
+                    console.error(`No response received from API:`, error.request);
+                } else {
+                    console.error(`Error setting up request:`, error.message);
+                }
+                throw error;
             }
-            throw error;
         }
+
+        return results;
     }
 }
