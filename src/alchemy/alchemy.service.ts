@@ -129,7 +129,7 @@ export class AlchemyService {
                 // Update the token value with new price and timestamp
                 const updatedValue = [
                     ...(token.value || []),
-                    { price: tokenData.prices[0].value, date: tokenData.prices[0].lastUpdatedAt },
+                    { value: tokenData.prices[0].value, timestamp: tokenData.prices[0].lastUpdatedAt },
                 ];
 
                 // Update the token value in the database
@@ -156,42 +156,27 @@ export class AlchemyService {
         }
     }
 
-    async getTokenHistoricPrices(tokenAddress: string, startTimes: string[],interval: string): Promise<{ price: number; date: string }[]> {
-        const url = `https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`;
-        const results: { price: number; date: string }[] = [];
-        
-        for (const startTime of startTimes) {
-            const beginDate = new Date(startTime);
-            const formattedBeginDate = beginDate.toISOString();
-            const formattedEndDate = new Date().toISOString();
-
-            const data = {
-                startTime: formattedBeginDate,
-                endTime: formattedEndDate,
-                interval: interval,
-                address: tokenAddress,
-                network: "base",
-            };
-
-            try {
-                const response = await axios.post(url, data);
-                const priceArray = response.data.data.map((item: any) => ({
-                    price: item.value,
-                    date: item.timestamp,
-                }));
-                results.push(...priceArray);
-            } catch (error) {
-                if (error.response) {
-                    console.error(`API returned an error:`, error.response.data);
-                } else if (error.request) {
-                    console.error(`No response received from API:`, error.request);
-                } else {
-                    console.error(`Error setting up request:`, error.message);
+    async getTokenHistoricPrices(symbol: string, startTimes: string, interval: string): Promise<any> {
+        const options = {
+            method: 'POST',
+            headers: {accept: 'application/json', 'content-type': 'application/json'},
+            body: JSON.stringify({
+              symbol: symbol,
+              startTime: startTimes,
+              endTime: new Date().toISOString(),
+              interval: interval
+            })
+          };
+          
+        fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
+            .then(res => res.json())
+            .then(res => {
+                if (this.supabase.from('token_list').select('value').eq('symbol', symbol).value.length === null) {
+                    this.supabase.from('token_list').update({ value: res.data }).eq('symbol', symbol)
                 }
-                throw error;
-            }
-        }
-
-        return results;
+                return res.data;
+            })
+            .catch(err => Logger.log(err));
+        
     }
 }

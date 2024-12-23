@@ -20,10 +20,8 @@ export class AlchemyController {
         return this.alchemyService.getTokenPriceInEuro();
     }
 
-    @Post('get-token-history/:token')
-    async getTokenHistory(@Param('tokenAdress') tokenAddress: string): Promise<any> {
-        let start_time = ['2024-11-21T00:00:00Z', '2024-12-21T00:00:00Z'];
-        let interval = '1d';
-        return this.alchemyService.getTokenHistoricPrices(tokenAddress, start_time, interval);
+    @Get('get-token-history')
+    async getTokenHistoricPrices(@Body() body: {symbol: string, start_times: string, interval: string}) {
+        return this.alchemyService.getTokenHistoricPrices(body.symbol, body.start_times, body.interval);
     }
 }
