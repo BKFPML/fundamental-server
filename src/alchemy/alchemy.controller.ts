@@ -22,6 +22,7 @@ export class AlchemyController {
 
     @Get('get-token-history')
     async getTokenHistoricPrices(@Body() body: {symbol: string, start_times: string, interval: string}) {
+        
         return this.alchemyService.getTokenHistoricPrices(body.symbol, body.start_times, body.interval);
     }
 }
