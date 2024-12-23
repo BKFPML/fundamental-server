@@ -95,7 +95,7 @@ export class AlchemyService {
         }
     }
 
-    async getTokenPriceInEuro(): Promise<any> {
+    async getTokenPriceInDollars(): Promise<any> {
         try {
 
             // Fetch tokens from the database
