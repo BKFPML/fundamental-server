@@ -167,7 +167,7 @@ export class AlchemyService {
               interval: interval
             })
           };
-          
+
         fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
             .then(res => res.json())
             .then(async res => {
@@ -189,6 +189,6 @@ export class AlchemyService {
                 return res.data;
             })
             .catch(err => Logger.log(err));
-        
+
     }
 }
