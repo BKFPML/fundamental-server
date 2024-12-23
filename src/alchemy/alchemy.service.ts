@@ -3,6 +3,8 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { log } from 'console';
 import { createClient } from '@supabase/supabase-js';
+import { interval } from 'rxjs';
+import { start } from 'repl';
 
 @Injectable()
 export class AlchemyService {
@@ -156,39 +158,57 @@ export class AlchemyService {
         }
     }
 
-    async getTokenHistoricPrices(symbol: string = "WETH", startTimes: string="2024-11-21T00:00:00Z", interval: string="1d"): Promise<any> {
-        const options = {
-            method: 'POST',
-            headers: {accept: 'application/json', 'content-type': 'application/json'},
-            body: JSON.stringify({
-              symbol: symbol,
-              startTime: startTimes,
-              endTime: new Date().toISOString(),
-              interval: interval
-            })
-          };
-          
-        fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
-            .then(res => res.json())
-            .then(async res => {
-                const { data: token, error } = await this.supabase.from('token_list').select('name, value').eq('symbol', symbol);
-                if (error) {
-                    throw new Error(`Error fetching token (${symbol}): ${error.message}`);
-                }
-                Logger.log(token);
-                if (token[0].value === null) {
-                    Logger.log("Inserting new token");
-                    Logger.log(res.data);
-                    Logger.log(symbol);
-                    const { error: updateError } = await this.supabase.from('token_list').update({ value: res.data }).eq('symbol', symbol)
-
-                    if (updateError) {
-                        throw new Error(`Error updating token (${symbol}): ${updateError.message}`)
+    async getTokenHistoricPrices(symbol: string = "WETH"): Promise<any> {
+        let result: { value: string; timestamp: string }[] = [];
+        const seen = new Set<string>();
+    
+        const currentTime = new Date();
+        const intervals = [
+            { interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 7 }, // 364 days of daily data with 7 day step because of API limits only daily data is available not 7d interval
+            { interval: "1d", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
+            { interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 7 days of hourly data with 6 hour step because of API limits only hourly data is available not 6h interval
+            { interval: "1h", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
+        ];
+    
+        for (const i of intervals) {
+            Logger.log(`Fetching historic prices for ${symbol} with interval ${i.interval} from ${i.startTime} to ${currentTime.toISOString()}`);
+            const options = {
+                method: 'POST',
+                headers: { accept: 'application/json', 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    startTime: i.startTime,
+                    endTime: currentTime.toISOString(),
+                    interval: i.interval,
+                }),
+            };
+    
+            await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
+                .then((res) => res.json())
+                .then((res) => {
+                    if (res.data) {
+                        const filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0); // Filter based on step size
+    
+                        filteredData.forEach((item: { value: string; timestamp: string }) => {
+                            const identifier = `${item.timestamp}`;
+                            if (!seen.has(identifier)) {
+                                seen.add(identifier);
+                                result.push(item);
+                            }
+                        });
                     }
-                }
-                return res.data;
-            })
-            .catch(err => Logger.log(err));
-        
+                })
+                .catch((err) => Logger.log(err));
+        }
+    
+        Logger.log(`Historic prices for ${symbol}: ${result.length} entries`);
+    
+        const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol);
+    
+        if (updateError) {
+            throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
+        }
+    
+        return result;
     }
-}
+}    
