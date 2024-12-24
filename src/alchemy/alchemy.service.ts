@@ -130,13 +130,13 @@ export class AlchemyService {
 
                 const currentTime = new Date();
 
-                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) {
+                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) { // If the last data point is older than 364 days
                     token.value = token.value.slice(0);
-                } else if (currentTime.getUTCHours() % 24 === 0) {
+                } else if (currentTime.getUTCHours() % 24 === 0) { // If the current hour is a multiple of 24 (midnight)
                     token.value = token.value.slice(0, 47) + token.value.slice(48);
-                } else if (currentTime.getUTCHours() % 6 === 0) {
+                } else if (currentTime.getUTCHours() % 6 === 0) { // If the current hour is a multiple of 6
                     token.value = token.value.slice(0, 77) + token.value.slice(78);
-                } else {
+                } else { // else remove the data point from 24 hours ago
                     token.value = token.value.slice(0, 92) + token.value.slice(93);
                 }
 
@@ -182,7 +182,7 @@ export class AlchemyService {
         ];
     
         for (const i of intervals) {
-            Logger.log(`Fetching historic prices for ${symbol} with interval ${i.interval} from ${i.startTime} to ${currentTime.toISOString()}`);
+
             const options = {
                 method: 'POST',
                 headers: { accept: 'application/json', 'content-type': 'application/json' },
@@ -200,13 +200,13 @@ export class AlchemyService {
                     if (res.data) {
                         let filteredData = res.data;
 
-                        if (i.data_keep === 6) {
+                        if (i.data_keep === 6) { 
                             filteredData = res.data.filter((_item: any, index: number) =>new Date(res.data[index].timestamp).getUTCHours() % i.data_keep === 0);
                         } else {
                             filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0);
                         }
 
-                        filteredData.forEach((item: { value: string; timestamp: string }) => {
+                        filteredData.forEach((item: { value: string; timestamp: string }) => { // loop through the data and only keep the first data point of each hour
                             const identifier = `${item.timestamp.slice(0, 13)}`; // only keep the first 13 characters of the timestamp aka the date and hour
                             if (!seen.has(identifier)) {
                                 seen.add(identifier);
@@ -215,18 +215,14 @@ export class AlchemyService {
                         });
                     }
                 })
-                .catch((err) => Logger.log(err));
+                .catch((err) => {throw new Error(`Error fetching token history (${symbol}): ${err.message}`)});
         }
     
-        //sort the result by timestamp
-
         result.sort((a, b) => {
-            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(); // sort by timestamp
         });
-
-        Logger.log(`Historic prices for ${symbol}: ${result.length} entries`);
     
-        const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol);
+        const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol); // Update the token value in the database
     
         if (updateError) {
             throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
