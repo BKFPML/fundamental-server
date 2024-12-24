@@ -128,7 +128,18 @@ export class AlchemyService {
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) return null; // Skip if no matching token found
 
-                // Update the token value with new price and timestamp
+                const currentTime = new Date();
+
+                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) {
+                    token.value = token.value.slice(0);
+                } else if (currentTime.getUTCHours() % 24 === 0) {
+                    token.value = token.value.slice(0, 47) + token.value.slice(48);
+                } else if (currentTime.getUTCHours() % 6 === 0) {
+                    token.value = token.value.slice(0, 77) + token.value.slice(78);
+                } else {
+                    token.value = token.value.slice(0, 92) + token.value.slice(93);
+                }
+
                 const updatedValue = [
                     ...(token.value || []),
                     { value: tokenData.prices[0].value, timestamp: tokenData.prices[0].lastUpdatedAt },
@@ -187,10 +198,16 @@ export class AlchemyService {
                 .then((res) => res.json())
                 .then((res) => {
                     if (res.data) {
-                        const filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0); // Filter based on step size
-    
+                        let filteredData = res.data;
+
+                        if (i.data_keep === 6) {
+                            filteredData = res.data.filter((_item: any, index: number) =>new Date(res.data[index].timestamp).getUTCHours() % i.data_keep === 0);
+                        } else {
+                            filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0);
+                        }
+
                         filteredData.forEach((item: { value: string; timestamp: string }) => {
-                            const identifier = `${item.timestamp}`;
+                            const identifier = `${item.timestamp.slice(0, 13)}`; // only keep the first 13 characters of the timestamp aka the date and hour
                             if (!seen.has(identifier)) {
                                 seen.add(identifier);
                                 result.push(item);
@@ -201,6 +218,12 @@ export class AlchemyService {
                 .catch((err) => Logger.log(err));
         }
     
+        //sort the result by timestamp
+
+        result.sort((a, b) => {
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        });
+
         Logger.log(`Historic prices for ${symbol}: ${result.length} entries`);
     
         const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol);
