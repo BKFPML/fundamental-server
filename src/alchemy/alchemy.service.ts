@@ -156,8 +156,8 @@ export class AlchemyService {
                 }
 
                 return {
-                    price: tokenData.prices[0].value,
-                    date: tokenData.prices[0].lastUpdatedAt,
+                    value: tokenData.prices[0].value,
+                    timestamp: tokenData.prices[0].lastUpdatedAt,
                 };
             });
 
