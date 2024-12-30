@@ -3,6 +3,8 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { log } from 'console';
 import { createClient } from '@supabase/supabase-js';
+import { interval } from 'rxjs';
+import { start } from 'repl';
 
 @Injectable()
 export class AlchemyService {
@@ -126,10 +128,21 @@ export class AlchemyService {
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) return null; // Skip if no matching token found
 
-                // Update the token value with new price and timestamp
+                const currentTime = new Date();
+
+                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) { // If the last data point is older than 364 days
+                    token.value = token.value.slice(0);
+                } else if (currentTime.getUTCHours() % 24 === 0) { // If the current hour is a multiple of 24 (midnight)
+                    token.value = token.value.slice(0, 47) + token.value.slice(48);
+                } else if (currentTime.getUTCHours() % 6 === 0) { // If the current hour is a multiple of 6
+                    token.value = token.value.slice(0, 77) + token.value.slice(78);
+                } else { // else remove the data point from 24 hours ago
+                    token.value = token.value.slice(0, 92) + token.value.slice(93);
+                }
+
                 const updatedValue = [
                     ...(token.value || []),
-                    { price: tokenData.prices[0].value, date: tokenData.prices[0].lastUpdatedAt },
+                    { value: tokenData.prices[0].value, timestamp: tokenData.prices[0].lastUpdatedAt },
                 ];
 
                 // Update the token value in the database
@@ -143,8 +156,8 @@ export class AlchemyService {
                 }
 
                 return {
-                    price: tokenData.prices[0].value,
-                    date: tokenData.prices[0].lastUpdatedAt,
+                    value: tokenData.prices[0].value,
+                    timestamp: tokenData.prices[0].lastUpdatedAt,
                 };
             });
 
@@ -156,34 +169,65 @@ export class AlchemyService {
         }
     }
 
-    async getTokenHistoricPrice(symbol: string, beginDate: Date, endDate: Date, interval: Number, tokenAddress: string, network: string): Promise<any> {
-        const formattedBeginDate = beginDate.toISOString();
-        const formattedEndDate = endDate.toISOString();
-        const url = `https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`;
-        console.log(tokenAddress, network);
-        try {
-            const data = {
-                startTime: formattedBeginDate,
-                endTime: formattedEndDate,
-                interval: interval,
-                address: tokenAddress,
-                network: network
+    async getTokenHistoricPrices(symbol: string = "WETH"): Promise<any> {
+        let result: { value: string; timestamp: string }[] = [];
+        const seen = new Set<string>();
+    
+        const currentTime = new Date();
+        const intervals = [
+            { interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 7 }, // 364 days of daily data with 7 day step because of API limits only daily data is available not 7d interval
+            { interval: "1d", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
+            { interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 7 days of hourly data with 6 hour step because of API limits only hourly data is available not 6h interval
+            { interval: "1h", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
+        ];
+    
+        for (const i of intervals) {
+
+            const options = {
+                method: 'POST',
+                headers: { accept: 'application/json', 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    startTime: i.startTime,
+                    endTime: currentTime.toISOString(),
+                    interval: i.interval,
+                }),
             };
-            const response = await axios.post(url, data);
-            const priceArray = response.data.data.map(data => ({
-                price: data.value,
-                date: data.timestamp,
-            }));
-            return response.data;
-        } catch (error) {
-            if (error.response) {
-                console.error(`API returned an error:`, error.response.data);
-            } else if (error.request) {
-                console.error(`No response received from API:`, error.request);
-            } else {
-                console.error(`Error setting up request:`, error.message);
-            }
-            throw error;
+    
+            await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
+                .then((res) => res.json())
+                .then((res) => {
+                    if (res.data) {
+                        let filteredData = res.data;
+
+                        if (i.data_keep === 6) { 
+                            filteredData = res.data.filter((_item: any, index: number) =>new Date(res.data[index].timestamp).getUTCHours() % i.data_keep === 0);
+                        } else {
+                            filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0);
+                        }
+
+                        filteredData.forEach((item: { value: string; timestamp: string }) => { // loop through the data and only keep the first data point of each hour
+                            const identifier = `${item.timestamp.slice(0, 13)}`; // only keep the first 13 characters of the timestamp aka the date and hour
+                            if (!seen.has(identifier)) {
+                                seen.add(identifier);
+                                result.push(item);
+                            }
+                        });
+                    }
+                })
+                .catch((err) => {throw new Error(`Error fetching token history (${symbol}): ${err.message}`)});
         }
+    
+        result.sort((a, b) => {
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(); // sort by timestamp
+        });
+    
+        const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol); // Update the token value in the database
+    
+        if (updateError) {
+            throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
+        }
+    
+        return result;
     }
-}
+}    
