@@ -135,9 +135,9 @@ export class AlchemyService {
                 } else if (currentTime.getUTCHours() % 24 === 0) { // If the current hour is a multiple of 24 (midnight)
                     token.value = token.value.slice(0, 47) + token.value.slice(48);
                 } else if (currentTime.getUTCHours() % 6 === 0) { // If the current hour is a multiple of 6
-                    token.value = token.value.slice(0, 77) + token.value.slice(78);
-                } else { // else remove the data point from 24 hours ago
-                    token.value = token.value.slice(0, 92) + token.value.slice(93);
+                    token.value = token.value.slice(0, 70) + token.value.slice(71);
+                } else { // else remove the data point from 24 hours ago because it's not needed to keep the data up to date and it's not a multiple of 6 or 24 hours or 7 days 
+                    token.value = token.value.slice(0, 93) + token.value.slice(94);
                 }
 
                 const updatedValue = [
