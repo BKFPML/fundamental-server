@@ -129,17 +129,25 @@ export class AlchemyService {
                 if (!token) return null; // Skip if no matching token found
 
                 const currentTime = new Date();
-
-                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) { // If the last data point is older than 364 days
-                    token.value = token.value.slice(0);
-                } else if (currentTime.getUTCHours() % 24 === 0) { // If the current hour is a multiple of 24 (midnight)
-                    token.value = token.value.slice(0, 47) + token.value.slice(48);
-                } else if (currentTime.getUTCHours() % 6 === 0) { // If the current hour is a multiple of 6
-                    token.value = token.value.slice(0, 70) + token.value.slice(71);
-                } else { // else remove the data point from 24 hours ago because it's not needed to keep the data up to date and it's not a multiple of 6 or 24 hours or 7 days 
-                    token.value = token.value.slice(0, 93) + token.value.slice(94);
+                Logger.log(`Current time: ${currentTime}`);
+                Logger.log("Token value before slice:");
+                Logger.log(token);
+                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) {
+                    // If the last data point is older than 364 days
+                    token.value = token.value.slice(1); // No need to slice since we keep all data points
+                } else if (currentTime.getUTCHours() % 24 === 0) {
+                    // If the current hour is a multiple of 24 (midnight)
+                    token.value = [...token.value.slice(0, 50), ...token.value.slice(51)];
+                } else if (currentTime.getUTCHours() % 6 === 0) {
+                    // If the current hour is a multiple of 6
+                    token.value = [...token.value.slice(0, 70), ...token.value.slice(71)];
+                } else {
+                    // Remove the data point from 24 hours ago to keep data up-to-date
+                    token.value = [...token.value.slice(0, 95), ...token.value.slice(96)];
                 }
-
+                
+                Logger.log("Token value after slice:");
+                Logger.log(token);
                 const updatedValue = [
                     ...(token.value || []),
                     { value: tokenData.prices[0].value, timestamp: tokenData.prices[0].lastUpdatedAt },
