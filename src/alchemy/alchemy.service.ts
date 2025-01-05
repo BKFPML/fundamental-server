@@ -191,4 +191,8 @@ export class AlchemyService {
             .catch(err => Logger.log(err));
 
     }
+
+    async UpdateCurrenciesPrice(): Promise<any> {
+        
+    }
 }
