@@ -180,7 +180,7 @@ export class AlchemyService {
     async getTokenHistoricPrices(symbol: string = "WETH"): Promise<any> {
         let result: { value: string; timestamp: string }[] = [];
         const seen = new Set<string>();
-    
+
         const currentTime = new Date();
         const intervals = [
             { interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 7 }, // 364 days of daily data with 7 day step because of API limits only daily data is available not 7d interval
@@ -188,7 +188,7 @@ export class AlchemyService {
             { interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 7 days of hourly data with 6 hour step because of API limits only hourly data is available not 6h interval
             { interval: "1h", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
         ];
-    
+
         for (const i of intervals) {
 
             const options = {
@@ -201,14 +201,14 @@ export class AlchemyService {
                     interval: i.interval,
                 }),
             };
-    
+
             await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
                 .then((res) => res.json())
                 .then((res) => {
                     if (res.data) {
                         let filteredData = res.data;
 
-                        if (i.data_keep === 6) { 
+                        if (i.data_keep === 6) {
                             filteredData = res.data.filter((_item: any, index: number) =>new Date(res.data[index].timestamp).getUTCHours() % i.data_keep === 0);
                         } else {
                             filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0);
@@ -225,21 +225,67 @@ export class AlchemyService {
                 })
                 .catch((err) => {throw new Error(`Error fetching token history (${symbol}): ${err.message}`)});
         }
-    
+
         result.sort((a, b) => {
             return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(); // sort by timestamp
         });
-    
+
         const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol); // Update the token value in the database
-    
+
         if (updateError) {
             throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
         }
-    
+
         return result;
     }
 
-    async UpdateCurrenciesPrice(): Promise<any> {
-        
+    async getCurrenciesPrice(symbol: string = "EUR,GBP"): Promise<any> {
+        try {
+            const base = 'USD'; // base currency for conversion
+            const currentTime = new Date();
+            const begin_date = currentTime.toISOString().split('T')[0];
+            const end_date = new Date(currentTime);
+            end_date.setFullYear(currentTime.getFullYear() - 1);
+            const formatted_date = end_date.toISOString().split('T')[0];
+            const url = `https://api.frankfurter.dev/v1/${formatted_date}..${begin_date}?base=${base}&symbols=${symbol}`;
+            const response = await axios.get(url, {
+                headers: { accept: 'application/json', 'content-type': 'application/json' },
+            });
+            const { data } = response;
+            const result = Object.entries(data.rates).flatMap(([timestamp, rates]) =>
+                Object.entries(rates).map(([currency, value]) => ({
+                    timestamp,
+                    symbol: currency,
+                    value,
+                }))
+            );
+            const groupedResult = result.reduce((acc, item) => {
+                if (!acc[item.symbol]) {
+                    acc[item.symbol] = [];
+                }
+                acc[item.symbol].push({
+                    timestamp: item.timestamp,
+                    value: item.value,
+                });
+                return acc;
+            }, {} as Record<string, any[]>);
+            // Iterate over each symbol and update the database
+            for (const [symbol, values] of Object.entries(groupedResult)) {
+                const { error: updateError } = await this.supabase
+                    .from('exchange_rate')
+                    .update({ value: values }) // Update the value for the current symbol
+                    .eq('symbol', symbol); // Match the current symbol in the database
+                if (updateError) {
+                    console.error(`Failed to update symbol ${symbol}:`, updateError.message);
+                    throw updateError; // Optionally rethrow the error if critical
+                } else {
+                    console.log(`Successfully updated symbol ${symbol} in the database.`);
+                }
+            }
+            return groupedResult;
+        } catch (error) {
+            console.error('Error fetching or updating currency prices:', error.message);
+            throw error;
+        }
     }
 }
