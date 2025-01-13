@@ -145,7 +145,7 @@ export class AlchemyService {
                     // Remove the data point from 24 hours ago to keep data up-to-date
                     token.value = [...token.value.slice(0, 95), ...token.value.slice(96)];
                 }
-                
+
                 Logger.log("Token value after slice:");
                 Logger.log(token);
                 const updatedValue = [
@@ -241,7 +241,7 @@ export class AlchemyService {
 
     async getCurrenciesPrice(symbol: string = "EUR,GBP"): Promise<any> {
         try {
-            const base = 'USD'; // base currency for conversion
+            const base = 'USD';
             const currentTime = new Date();
             const begin_date = currentTime.toISOString().split('T')[0];
             const end_date = new Date(currentTime);
@@ -269,15 +269,14 @@ export class AlchemyService {
                 });
                 return acc;
             }, {} as Record<string, any[]>);
-            // Iterate over each symbol and update the database
             for (const [symbol, values] of Object.entries(groupedResult)) {
                 const { error: updateError } = await this.supabase
                     .from('exchange_rate')
-                    .update({ value: values }) // Update the value for the current symbol
-                    .eq('symbol', symbol); // Match the current symbol in the database
+                    .update({ value: values })
+                    .eq('symbol', symbol);
                 if (updateError) {
                     console.error(`Failed to update symbol ${symbol}:`, updateError.message);
-                    throw updateError; // Optionally rethrow the error if critical
+                    throw updateError;
                 } else {
                     console.log(`Successfully updated symbol ${symbol} in the database.`);
                 }
