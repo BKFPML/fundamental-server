@@ -239,7 +239,18 @@ export class AlchemyService {
         return result;
     }
 
-    async getCurrenciesPrice(symbol: string = "EUR,GBP"): Promise<any> {
+    async getCurrenciesPrice(): Promise<any> {
+        // Fetch symbols from the database
+        const { data: tokens, error } = await this.supabase
+            .from('exchange_rate')
+            .select('symbol, value');
+
+        if (error) throw new Error(`Error fetching tokens: ${error.message}`);
+        if (!tokens || tokens.length === 0) return [];
+
+        // Dynamically create the symbols parameter
+        const symbols = tokens.map((token: { symbol: string }) => token.symbol).join(',');
+
         try {
             const base = 'USD';
             const currentTime = new Date();
@@ -247,11 +258,13 @@ export class AlchemyService {
             const end_date = new Date(currentTime);
             end_date.setFullYear(currentTime.getFullYear() - 1);
             const formatted_date = end_date.toISOString().split('T')[0];
-            const url = `https://api.frankfurter.dev/v1/${formatted_date}..${begin_date}?base=${base}&symbols=${symbol}`;
+            // Make the API request using the dynamically created symbols
+            const url = `https://api.frankfurter.dev/v1/${formatted_date}..${begin_date}?base=${base}&symbols=${symbols}`;
             const response = await axios.get(url, {
                 headers: { accept: 'application/json', 'content-type': 'application/json' },
             });
             const { data } = response;
+            // Process the API response
             const result = Object.entries(data.rates).flatMap(([timestamp, rates]) =>
                 Object.entries(rates).map(([currency, value]) => ({
                     timestamp,
@@ -259,6 +272,8 @@ export class AlchemyService {
                     value,
                 }))
             );
+
+            // Group results by symbol
             const groupedResult = result.reduce((acc, item) => {
                 if (!acc[item.symbol]) {
                     acc[item.symbol] = [];
@@ -269,18 +284,44 @@ export class AlchemyService {
                 });
                 return acc;
             }, {} as Record<string, any[]>);
+
+            // Update the database with the fetched data
             for (const [symbol, values] of Object.entries(groupedResult)) {
-                const { error: updateError } = await this.supabase
+                const newestEntry = values[values.length - 1];
+
+                // Get the latest entry from the database for this symbol
+                const { data: dbData, error: fetchError } = await this.supabase
                     .from('exchange_rate')
-                    .update({ value: values })
-                    .eq('symbol', symbol);
-                if (updateError) {
-                    console.error(`Failed to update symbol ${symbol}:`, updateError.message);
-                    throw updateError;
+                    .select('value')
+                    .eq('symbol', symbol)
+                    .single();
+                if (fetchError) {
+                    console.error(`Failed to fetch existing data for ${symbol}:`, fetchError.message);
+                    throw fetchError;
+                }
+                const dbValues = dbData?.value || [];
+                const dbLatestDate = dbValues[dbValues.length - 1]?.timestamp;
+
+                if (newestEntry.timestamp !== dbLatestDate) {
+                    // Add the newest entry and remove the oldest one
+                    const updatedValues = [...dbValues.slice(1), newestEntry]; // Remove the oldest entry and add the new one
+
+                    const { error: updateError } = await this.supabase
+                        .from('exchange_rate')
+                        .update({ value: updatedValues })
+                        .eq('symbol', symbol);
+
+                    if (updateError) {
+                        console.error(`Failed to update symbol ${symbol}:`, updateError.message);
+                        throw updateError;
+                    } else {
+                        console.log(`Successfully updated symbol ${symbol} in the database.`);
+                    }
                 } else {
-                    console.log(`Successfully updated symbol ${symbol} in the database.`);
+                    console.log(`No new data for ${symbol}. Skipping update.`);
                 }
             }
+
             return groupedResult;
         } catch (error) {
             console.error('Error fetching or updating currency prices:', error.message);
