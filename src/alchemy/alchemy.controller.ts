@@ -25,8 +25,8 @@ export class AlchemyController {
         return this.alchemyService.getTokenHistoricPrices(symbol);
     }
 
-    @Get('get-currencies-price/:symbol')
-    async getCurrenciesPrice(@Param('symbol') symbol: string): Promise<any> {
+    @Get('get-currencies-price/')
+    async getCurrenciesPrice(): Promise<any> {
         return this.alchemyService.getCurrenciesPrice();
     }
 }
