@@ -15,7 +15,7 @@ export const handler: Handler = async (event) => {
             body: JSON.stringify({ error: 'Currencies not provided' }),
         };
     }
-    const data = await alchemyService.getCurrenciesPrice(symbol);
+    const data = await alchemyService.getCurrenciesPrice();
     if (!data) {
         return {
             statusCode: 404,
