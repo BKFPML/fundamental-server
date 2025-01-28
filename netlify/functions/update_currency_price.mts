@@ -9,18 +9,13 @@ export default async (req: Request) => {
         const { next_run } = await req.json();
         console.log("Received event! Next invocation at:", next_run);
 
-        const data = await alchemyService.getCurrenciesPrice();
+        const data = await alchemyService.updateCurrencyPrice();
 
-        if (!data) {
-            return new Response(
-                JSON.stringify({ error: 'Balance not found' }),
-                { status: 404, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
         return {
             statusCode: 200,
             body: JSON.stringify({ data }),
         };
+
     } catch (error) {
         console.error('Error processing request:', error.message);
         return new Response(

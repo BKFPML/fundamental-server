@@ -9,21 +9,18 @@ const alchemyService = new AlchemyService(new ConfigService());
 export const handler: Handler = async (event) => {
     // Appel de la méthode getCurrenciesPrice de AlchemyService pour récupérer les données des currencies
     const symbol = event.path.split('/').pop();
+
     if (!symbol) {
         return {
             statusCode: 400,
             body: JSON.stringify({ error: 'Currencies not provided' }),
         };
     }
-    const data = await alchemyService.getCurrenciesPrice();
-    if (!data) {
-        return {
-            statusCode: 404,
-            body: JSON.stringify({ error: 'Balance not found' }),
-        };
-    }
+
+    await alchemyService.getCurrenciesHistoricPrice(symbol);
+
     return {
         statusCode: 200,
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ "message": "Currencies prices updated successfully" }),
     };
 };

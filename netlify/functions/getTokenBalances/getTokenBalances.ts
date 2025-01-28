@@ -2,26 +2,26 @@ import { Handler } from '@netlify/functions';
 import { AlchemyService } from '../../../src/alchemy/alchemy.service';
 import { ConfigService } from '@nestjs/config';
 
-
+// Création d'une instance de AlchemyService avec ConfigService comme paramètre
 const alchemyService = new AlchemyService(new ConfigService());
 
 export const handler: Handler = async (event) => {
+    // Récupération de l'adresse dans l'URL de la requête HTTP
     const address = event.path.split('/').pop();
+
     if (!address) {
         return {
             statusCode: 400,
             body: JSON.stringify({ error: 'Address not provided' }),
         };
     }
-    const data = await alchemyService.getEthBalance(address);
-    if (!data) {
-        return {
-            statusCode: 404,
-            body: JSON.stringify({ error: 'Balance not found' }),
-        };
-    }
+
+    // Appel de la méthode updateTokenBalances de AlchemyService pour récupérer les données de l'adresse fournie
+    await alchemyService.updateTokenBalances(address);
+
+    // Retourner les données récupérées au format JSON
     return {
         statusCode: 200,
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ "message": "Token balances updated successfully" }),
     };
 };

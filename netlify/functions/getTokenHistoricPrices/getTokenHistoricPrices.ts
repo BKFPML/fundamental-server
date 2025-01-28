@@ -8,13 +8,16 @@ const alchemyService = new AlchemyService(new ConfigService());
 
 export const handler: Handler = async (event) => {
     const symbol = event.path.split('/').pop();
+
     if (!symbol) {
         return {
             statusCode: 400,
             body: JSON.stringify({ error: 'Address not provided' }),
         };
     }
+
     await alchemyService.getTokenHistoricPrices(symbol);
+    
     return {
         statusCode: 200,
         body: JSON.stringify({ message: 'Token ${symbol} historic prices updated' }),

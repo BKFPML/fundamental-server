@@ -9,14 +9,7 @@ export default async (req: Request) => {
         const { next_run } = await req.json();
         console.log("Received event! Next invocation at:", next_run);
 
-        const data = await alchemyService.getTokenPriceInDollars();
-
-        if (!data) {
-            return new Response(
-                JSON.stringify({ error: 'Balance not found' }),
-                { status: 404, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
+        const data = await alchemyService.updateTokenPriceInDollars();
 
         return new Response(
             JSON.stringify({ data }),

@@ -5,28 +5,28 @@ import { AlchemyService } from './alchemy.service';
 export class AlchemyController {
     constructor(readonly alchemyService: AlchemyService) {}
 
-    @Get('eth-balance/:address')
-    async getEthBalance(@Param('address') address: string): Promise<string> {
-        return this.alchemyService.getEthBalance(address);
-    }
-
-    @Get('token-balances/:address')
-    async updateTokenBalances(@Param('address') address: string): Promise<any[]> {
+    @Get('update-token-balances/:address')
+    async updateTokenBalancesController(@Param('address') address: string): Promise<any> {
         return this.alchemyService.updateTokenBalances(address);
     }
 
-    @Get('token-price-in-euro/:token')
-    async getTokenPriceInDollars(): Promise<any> {
-        return this.alchemyService.getTokenPriceInDollars();
-    }
-
     @Get('get-token-history/:symbol')
-    async getTokenHistoricPrices(@Param('symbol') symbol: string): Promise<any> {
+    async getTokenHistoricPricesController(@Param('symbol') symbol: string): Promise<void> {
         return this.alchemyService.getTokenHistoricPrices(symbol);
     }
 
-    @Get('get-currencies-price/')
-    async getCurrenciesPrice(): Promise<any> {
-        return this.alchemyService.getCurrenciesPrice();
+    @Get('update-token-price/')
+    async updateTokenPriceInDollarsController() {
+        return this.alchemyService.updateTokenPriceInDollars();
+    }
+
+    @Get('get-currencies-history/:currency')
+    async getCurrenciesHistoricPriceController(@Param('currency') currency: string): Promise<void> {
+        return this.alchemyService.getCurrenciesHistoricPrice(currency);
+    }
+
+    @Get('update-currency-price/')
+    async updateCurrencyPriceController(): Promise<void> {
+        return this.alchemyService.updateCurrencyPrice();
     }
 }

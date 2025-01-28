@@ -11,17 +11,11 @@ export default async (req: Request) => {
 
         const data = await alchemyService.updateTokenBalances();
 
-        if (!data) {
-            return new Response(
-                JSON.stringify({ error: 'Balance not found' }),
-                { status: 404, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
-
         return new Response(
             JSON.stringify({ data }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
+
     } catch (error) {
         console.error('Error processing request:', error.message);
         return new Response(
