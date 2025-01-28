@@ -22,6 +22,10 @@ export class AlchemyService {
         this.supabase = createClient(this.supabaseUrl, this.supabaseKey); // Création du client Supabase
     }
 
+    async delay(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     public async updateTokenBalances(address: string): Promise<any[]> {
         const network = "base";
         const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
@@ -129,68 +133,66 @@ export class AlchemyService {
                 if (!token) return null; // Skip if no matching token found
 
                 const currentTime = new Date();
-                Logger.log(`Current time: ${currentTime}`);
-                Logger.log("Token value before slice:");
-                Logger.log(token);
+
                 if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) {
-                    // If the last data point is older than 364 days
-                    token.value = token.value.slice(1); // No need to slice since we keep all data points
-                } else if (currentTime.getUTCHours() % 24 === 0) {
-                    // If the current hour is a multiple of 24 (midnight)
-                    token.value = [...token.value.slice(0, 50), ...token.value.slice(51)];
-                } else if (currentTime.getUTCHours() % 6 === 0) {
-                    // If the current hour is a multiple of 6
-                    token.value = [...token.value.slice(0, 70), ...token.value.slice(71)];
-                } else {
-                    // Remove the data point from 24 hours ago to keep data up-to-date
-                    token.value = [...token.value.slice(0, 95), ...token.value.slice(96)];
+                    const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ yearly_value: tokenData.prices })
+                    .eq('symbol', tokenData.symbol);
+
+                    if (updateError) {
+                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    }
                 }
 
-                Logger.log("Token value after slice:");
-                Logger.log(token);
-                const updatedValue = [
-                    ...(token.value || []),
-                    { value: tokenData.prices[0].value, timestamp: tokenData.prices[0].lastUpdatedAt },
-                ];
+                if (currentTime.getUTCHours() % 24 === 0) {
+                    const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ monthly_value: tokenData.prices })
+                    .eq('symbol', tokenData.symbol);
 
-                // Update the token value in the database
+                    if (updateError) {
+                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    }
+                }
+
+                if (currentTime.getUTCHours() % 6 === 0) {
+                    const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ weekly_value: tokenData.prices })
+                    .eq('symbol', tokenData.symbol);
+
+                    if (updateError) {
+                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    }
+                }
+
                 const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ value: updatedValue })
+                    .update({ daily_value: tokenData.prices })
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError) {
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                 }
 
-                return {
-                    value: tokenData.prices[0].value,
-                    timestamp: tokenData.prices[0].lastUpdatedAt,
-                };
             });
-
-            // Wait for all updates to complete
-            return await Promise.all(updates);
         } catch (error) {
             console.error('Error fetching or updating token prices:', error.message);
             throw error;
         }
     }
 
-    async getTokenHistoricPrices(symbol: string = "WETH"): Promise<any> {
-        let result: { value: string; timestamp: string }[] = [];
-        const seen = new Set<string>();
-
+    async getTokenHistoricPrices(symbol: string = "ETH") {
         const currentTime = new Date();
         const intervals = [
-            { interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 7 }, // 364 days of daily data with 7 day step because of API limits only daily data is available not 7d interval
-            { interval: "1d", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
-            { interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 7 days of hourly data with 6 hour step because of API limits only hourly data is available not 6h interval
-            { interval: "1h", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
+            { name: "yearly_value", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 },
+            { name: "monthly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 },
+            { name: "weekly_value", interval: "5m", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 12 },
+            { name: "daily_value", interval: "5m", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 },
         ];
 
         for (const i of intervals) {
-
             const options = {
                 method: 'POST',
                 headers: { accept: 'application/json', 'content-type': 'application/json' },
@@ -201,42 +203,41 @@ export class AlchemyService {
                     interval: i.interval,
                 }),
             };
-
+    
+            Logger.log('Request sent to Alchemy:', options);
+    
             await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
-                .then((res) => res.json())
-                .then((res) => {
+                .then(async (res) => {
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        throw new Error(`API Error: ${res.status} ${errorText}`);
+                    }
+                    return res.json();
+                })
+                .then(async (res) => {
                     if (res.data) {
-                        let filteredData = res.data;
-
-                        if (i.data_keep === 6) {
-                            filteredData = res.data.filter((_item: any, index: number) =>new Date(res.data[index].timestamp).getUTCHours() % i.data_keep === 0);
-                        } else {
-                            filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0);
-                        }
-
-                        filteredData.forEach((item: { value: string; timestamp: string }) => { // loop through the data and only keep the first data point of each hour
-                            const identifier = `${item.timestamp.slice(0, 13)}`; // only keep the first 13 characters of the timestamp aka the date and hour
-                            if (!seen.has(identifier)) {
-                                seen.add(identifier);
-                                result.push(item);
+                        const data = res.data.filter((_, index) => index % i.data_keep === 0);
+    
+                        const symbolsToUpdate = symbol === "WETH" ? ["WETH", "ETH"] : [symbol];
+                        for (const sym of symbolsToUpdate) {
+                            const { error: updateError } = await this.supabase
+                                .from('token_list')
+                                .update({ [i.name]: data })
+                                .eq('symbol', sym);
+    
+                            if (updateError) {
+                                throw new Error(`Error updating token (${sym}): ${updateError.message}`);
                             }
-                        });
+                        }
+                    } else {
+                        throw new Error(`API returned no data for symbol: ${symbol}`);
                     }
                 })
-                .catch((err) => {throw new Error(`Error fetching token history (${symbol}): ${err.message}`)});
+                .catch((err) => {
+                    throw new Error(`Error fetching token history (${symbol}): ${err.message}`);
+                });
+            await this.delay(5000);
         }
-
-        result.sort((a, b) => {
-            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(); // sort by timestamp
-        });
-
-        const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol); // Update the token value in the database
-
-        if (updateError) {
-            throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
-        }
-
-        return result;
     }
 
     async getCurrenciesPrice(): Promise<any> {

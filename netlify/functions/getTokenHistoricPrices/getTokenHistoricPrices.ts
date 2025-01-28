@@ -14,15 +14,9 @@ export const handler: Handler = async (event) => {
             body: JSON.stringify({ error: 'Address not provided' }),
         };
     }
-    const data = await alchemyService.getTokenHistoricPrices(symbol);
-    if (!data) {
-        return {
-            statusCode: 404,
-            body: JSON.stringify({ error: 'Balance not found' }),
-        };
-    }
+    await alchemyService.getTokenHistoricPrices(symbol);
     return {
         statusCode: 200,
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ message: 'Token ${symbol} historic prices updated' }),
     };
 };
