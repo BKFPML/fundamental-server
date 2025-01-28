@@ -9,7 +9,7 @@ export default async (req: Request) => {
         const { next_run } = await req.json();
         console.log("Received event! Next invocation at:", next_run);
 
-        const data = await alchemyService.getTokenPriceInDollars();
+        const data = await alchemyService.updateTokenBalances();
 
         if (!data) {
             return new Response(
@@ -22,7 +22,6 @@ export default async (req: Request) => {
             JSON.stringify({ data }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
-
     } catch (error) {
         console.error('Error processing request:', error.message);
         return new Response(
@@ -33,5 +32,5 @@ export default async (req: Request) => {
 };
 
 export const config: Config = {
-    schedule: "*/10 * * * *"
+    schedule: "*/15 * * * *"
 };

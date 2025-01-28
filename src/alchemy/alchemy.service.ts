@@ -26,54 +26,64 @@ export class AlchemyService {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    public async updateTokenBalances(address: string): Promise<any[]> {
+    public async updateTokenBalances(address: string = "Empty"): Promise<any[]> {
         const network = "base";
         const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+        let users: any[] = address === "Empty" ? [] : [{ wallet_address: address }];
+        if (address === "Empty") {
+            // Fetch all users from the database
+            const { data: users, error } = await this.supabase.from('users').select('wallet_address');
+            if (error) throw new Error(`Error fetching users: ${error.message}`);
 
-        const data = {
-            jsonrpc: '2.0',
-            method: 'alchemy_getTokenBalances',
-            params: [address],
-            id: 1,
-        };
-
-        try {
-            // Fetch balances from Alchemy
-            const response = await axios.post(url, data);
-            const balances = response.data.result.tokenBalances;
-
-            // Fetch accepted tokens and convert them to a Map for efficient lookups
-            const { data: acceptedTokens, error } = await this.supabase
-                .from('token_list')
-                .select("address, digits");
-
-            if (error) throw new Error(`Error fetching accepted tokens: ${error.message}`);
-
-            const tokenMap = new Map(acceptedTokens.map(token => [token.address, token.digits]));
-
-            // Process balances
-            const res = balances
-                .filter(balance => tokenMap.has(balance.contractAddress)) // Filter only accepted tokens
-                .map(balance => {
-                    const decimals = tokenMap.get(balance.contractAddress) as number;
-                    const tokenBalance = Number(BigInt(balance.tokenBalance)) / Math.pow(10, decimals);
-
-                    return {
-                        token_address: balance.contractAddress,
-                        balance: tokenBalance,
-                    };
-                });
-
-            // Update balances in the database
-            const { error: updateError } = await this.supabase.from('users').update({ balances: res }).eq('wallet_address', address);
-
-            if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
-
-            return res;
-        } catch (error) {
-            Logger.error('Error fetching or processing token balances:', error.message);
-            throw error;
         }
+
+        for (const user of users) {
+            const data = {
+                jsonrpc: '2.0',
+                method: 'alchemy_getTokenBalances',
+                params: [user.wallet_address],
+                id: 1,
+            };
+
+            try {
+                // Fetch balances from Alchemy
+                const response = await axios.post(url, data);
+                const balances = response.data.result.tokenBalances;
+
+                // Fetch accepted tokens and convert them to a Map for efficient lookups
+                const { data: acceptedTokens, error } = await this.supabase
+                    .from('token_list')
+                    .select("address, digits");
+
+                if (error) throw new Error(`Error fetching accepted tokens: ${error.message}`);
+
+                const tokenMap = new Map(acceptedTokens.map(token => [token.address, token.digits]));
+
+                // Process balances
+                const res = balances
+                    .filter(balance => tokenMap.has(balance.contractAddress)) // Filter only accepted tokens
+                    .map(balance => {
+                        const decimals = tokenMap.get(balance.contractAddress) as number;
+                        const tokenBalance = Number(BigInt(balance.tokenBalance)) / Math.pow(10, decimals);
+
+                        return {
+                            token_address: balance.contractAddress,
+                            balance: tokenBalance,
+                        };
+                    });
+
+                // Update balances in the database
+                const { error: updateError } = await this.supabase.from('users').update({ balances: res }).eq('wallet_address', user.wallet_address);
+
+                if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
+
+                return res;
+            } catch (error) {
+                Logger.error('Error fetching or processing token balances:', error.message);
+                throw error;
+            }
+        }
+
     }
 
     public async getEthBalance(address: string): Promise<string> {
