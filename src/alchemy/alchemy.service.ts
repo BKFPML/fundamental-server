@@ -101,16 +101,15 @@ export class AlchemyService {
         }
     }
 
-    async getTokenPriceInDollars(): Promise<any> {
+    async getTokenPriceInDollars() {
         try {
 
             // Fetch tokens from the database
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
-                .select('symbol, value');
+                .select('symbol, daily_value, weekly_value, monthly_value, yearly_value');
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) return [];
-
             // Prepare the symbols query string
             const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&');
             const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`;
@@ -127,17 +126,23 @@ export class AlchemyService {
 
             // Process each token price and update the database
             const updates = results.map(async tokenData => {
-
+                tokenData.prices = tokenData.prices.map((price: any) => ({
+                    timestamp: price.lastUpdatedAt,
+                    value: price.value,
+                }));
                 // Find the token in the database by symbol previously fetched
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) return null; // Skip if no matching token found
 
                 const currentTime = new Date();
+                const startOfYear = new Date(currentTime.getFullYear(), 0, 0);
+                const diff = currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0);;
+                const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) {
+                if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
                     const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ yearly_value: tokenData.prices })
+                    .update({ yearly_value: token.yearly_value.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
@@ -145,10 +150,11 @@ export class AlchemyService {
                     }
                 }
 
-                if (currentTime.getUTCHours() % 24 === 0) {
+                if (currentTime.getUTCHours() % 6 === 0 && currentTime.getUTCMinutes() === 0) {
+
                     const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ monthly_value: tokenData.prices })
+                    .update({ monthly_value: token.monthly_value.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
@@ -156,10 +162,10 @@ export class AlchemyService {
                     }
                 }
 
-                if (currentTime.getUTCHours() % 6 === 0) {
+                if (currentTime.getUTCMinutes() === 0) {
                     const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ weekly_value: tokenData.prices })
+                    .update({ weekly_value: token.weekly_value.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
@@ -169,7 +175,7 @@ export class AlchemyService {
 
                 const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ daily_value: tokenData.prices })
+                    .update({ daily_value: token.daily_value.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError) {
@@ -183,13 +189,13 @@ export class AlchemyService {
         }
     }
 
-    async getTokenHistoricPrices(symbol: string = "ETH") {
+    async getTokenHistoricPrices(symbol: string = "WETH") {
         const currentTime = new Date();
         const intervals = [
-            { name: "yearly_value", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 },
-            { name: "monthly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 },
-            { name: "weekly_value", interval: "5m", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 12 },
-            { name: "daily_value", interval: "5m", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 },
+            { name: "yearly_value", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 }, // 364 / 3 = 121 value
+            { name: "monthly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 1 * 24 * 30 / 6 = 120 value
+            { name: "weekly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 }, // 1 * 24 * 7 = 168 value
+            { name: "daily_value", interval: "5m", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 2 },
         ];
 
         for (const i of intervals) {
