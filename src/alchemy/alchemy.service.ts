@@ -127,17 +127,15 @@ export class AlchemyService {
             // Process each token price and update the database
             const updates = results.map(async tokenData => {
                 tokenData.prices = tokenData.prices.map((price: any) => ({
-                    timestamp: price.lastUpdatedAt,
                     value: price.value,
+                    timestamp: price.lastUpdatedAt
                 }));
                 // Find the token in the database by symbol previously fetched
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) return null; // Skip if no matching token found
 
                 const currentTime = new Date();
-                const startOfYear = new Date(currentTime.getFullYear(), 0, 0);
-                const diff = currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0);;
-                const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
                 if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
                     const { error: updateError } = await this.supabase
@@ -180,6 +178,15 @@ export class AlchemyService {
 
                 if (updateError) {
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                }
+
+                const { error: updateError2 } = await this.supabase
+                    .from('token_list')
+                    .update({ last_value: tokenData.prices[0].value })
+                    .eq('symbol', tokenData.symbol);
+                
+                if (updateError2) {
+                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
                 }
 
             });
