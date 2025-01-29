@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
-import { log } from 'console';
 import { createClient } from '@supabase/supabase-js';
-import { interval } from 'rxjs';
-import { start } from 'repl';
+
 
 @Injectable()
 export class AlchemyService {
@@ -272,115 +270,4 @@ export class AlchemyService {
             }
         }
     }
-
-    /*
-
-                Currency API Calls
-
-    */
-
-
-    fillMissingData(rates: Record<string, Record<string, number>>, startDate: string, endDate: string) {
-                    const filledRates: Record<string, Record<string, number>> = {};
-                    let lastKnownDate: string | null = null;
-                    let lastKnownRate: Record<string, number> | null = null;
-            
-                    // Generate all dates from startDate to endDate
-                    const dateRange = this.generateDateRange(startDate, endDate);
-            
-                    for (const date of dateRange) {
-                        if (rates[date]) {
-                            // If the data exists for this date, store the current rates and update last known
-                            filledRates[date] = rates[date];
-                            lastKnownDate = date;
-                            lastKnownRate = rates[date];
-                        } else {
-                            // If data is missing, use the last known rate
-                            if (lastKnownRate) {
-                                filledRates[date] = lastKnownRate;
-                            }
-                        }
-                    }
-            
-                    return filledRates;
-    }
-
-    generateDateRange(startDate: string, endDate: string): string[] {
-                    const start = new Date(startDate);
-                    const end = new Date(endDate);
-                    const dateRange: string[] = [];
-            
-                    while (start <= end) {
-                        const year = start.getFullYear();
-                        const month = String(start.getMonth() + 1).padStart(2, '0');
-                        const day = String(start.getDate()).padStart(2, '0');
-                        dateRange.push(`${year}-${month}-${day}`);
-                        start.setDate(start.getDate() + 1);
-                    }
-            
-                    return dateRange;
-    }
-
-    // ON THE WAY TO BE IMPLEMENTED TO MOVE ON AN OTHER DIRECTORY BECAUSE IT'S NOT RELATED TO ALCHEMY
-    public async getCurrenciesHistoricPrice(symbol: string) {
-
-        try {
-            const base = 'USD';
-            const currentTime = new Date();
-            const begin_date = currentTime.toISOString().split('T')[0];
-            const end_date = new Date(currentTime);
-            end_date.setFullYear(currentTime.getFullYear() - 1);
-            const formatted_date = end_date.toISOString().split('T')[0];
-            // Make the API request using the dynamically created symbols
-            const url = `https://api.frankfurter.dev/v1/${formatted_date}..${begin_date}?base=${base}&symbols=${symbol}`;
-            const response = await axios.get(url, {
-                headers: { accept: 'application/json', 'content-type': 'application/json' },
-            });
-            const { data } = response;
-
-            const rates = data['rates'];
-            const filledRates = this.fillMissingData(rates, formatted_date, begin_date);
-
-            // Process the API response
-            const result = Object.entries(filledRates).flatMap(([timestamp, rates]) =>
-                Object.entries(rates).map(([currency, value]) => ({
-                    timestamp,
-                    symbol: currency,
-                    value,
-                }))
-            );
-
-            // Group results by symbol
-            const groupedResult = result.reduce((acc, item) => {
-                if (!acc[item.symbol]) {
-                    acc[item.symbol] = [];
-                }
-                acc[item.symbol].push({
-                    timestamp: item.timestamp,
-                    value: item.value,
-                });
-                return acc;
-            }, {} as Record<string, any[]>);
-
-            // Update the database with the fetched data
-            for (const [symbol, values] of Object.entries(groupedResult)) {
-
-                const { error: updateError } = await this.supabase
-                        .from('exchange_rate')
-                        .update({ value: values })
-                        .eq('symbol', symbol);
-
-                if (updateError) {
-                    throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
-                }
-            }
-
-        } catch (error) {
-            console.error('Error fetching or updating currency prices:', error.message);
-            throw error;
-        }
-    }
-
-    // TO DO
-    async updateCurrencyPrice() {}
 }

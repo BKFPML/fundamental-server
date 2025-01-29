@@ -1,19 +1,19 @@
 import type { Config } from "@netlify/functions";
 import { ConfigService } from '@nestjs/config';
-import { AlchemyService } from '../../src/alchemy/alchemy.service';
+import { FrankfurterService } from '../../src/frankfurter/frankfurter.service';
 
-const alchemyService = new AlchemyService(new ConfigService());
+const frankfurterService = new FrankfurterService(new ConfigService());
 
 export default async (req: Request) => {
     try {
         const { next_run } = await req.json();
         console.log("Received event! Next invocation at:", next_run);
 
-        const data = await alchemyService.updateCurrencyPrice();
+        await frankfurterService.updateCurrencyPrice();
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ data }),
+            body: JSON.stringify({ message: "Currency prices updated successfully" }),
         };
 
     } catch (error) {

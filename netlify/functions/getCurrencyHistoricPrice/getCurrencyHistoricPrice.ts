@@ -1,10 +1,9 @@
 import { Handler } from '@netlify/functions';
-import { AlchemyService } from '../../../src/alchemy/alchemy.service';
+import { FrankfurterService } from '../../../src/frankfurter/frankfurter.service';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from '@nestjs/common';
 
 // Création d'une instance de AlchemyService avec ConfigService comme paramètre
-const alchemyService = new AlchemyService(new ConfigService());
+const frankfurterService = new FrankfurterService(new ConfigService());
 
 export const handler: Handler = async (event) => {
     // Appel de la méthode getCurrenciesPrice de AlchemyService pour récupérer les données des currencies
@@ -17,7 +16,7 @@ export const handler: Handler = async (event) => {
         };
     }
 
-    await alchemyService.getCurrenciesHistoricPrice(symbol);
+    await frankfurterService.getCurrenciesHistoricPrice(symbol);
 
     return {
         statusCode: 200,
