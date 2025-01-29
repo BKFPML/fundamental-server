@@ -88,7 +88,7 @@ export class AlchemyService {
                 .catch((err) => {
                     throw new Error(`Error fetching token history (${symbol}): ${err.message}`);
                 });
-            await this.delay(5000);
+            await this.delay(1000);
         }
     }
 
