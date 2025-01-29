@@ -1,7 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { AlchemyService } from '../../../src/alchemy/alchemy.service';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from '@nestjs/common';
 
 // Création d'une instance de AlchemyService avec ConfigService comme paramètre
 const alchemyService = new AlchemyService(new ConfigService());

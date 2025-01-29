@@ -56,9 +56,7 @@ export class AlchemyService {
                     interval: i.interval,
                 }),
             };
-    
-            Logger.log('Request sent to Alchemy:', options);
-    
+
             await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
                 .then(async (res) => {
                     if (!res.ok) {
@@ -204,8 +202,7 @@ export class AlchemyService {
 
             const weiBalance = response.data.result;
             const ethBalance = parseFloat(weiBalance) / 1e18;
-            Logger.log(`Balance for address ${address}: ${weiBalance} WEI`);
-            Logger.log(`Balance for address ${address}: ${ethBalance} ETH`);
+
             return weiBalance;
         } catch (error) {
             Logger.log(error);
@@ -217,12 +214,16 @@ export class AlchemyService {
         const network = "base";
         const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
         let users: any[] = address === "Empty" ? [] : [{ wallet_address: address }];
+
         if (address === "Empty") {
             // Fetch all users from the database
-            const { data: users, error } = await this.supabase.from('users').select('wallet_address');
+            const { data: users_r, error } = await this.supabase.from('users').select('wallet_address, total_value');
             if (error) throw new Error(`Error fetching users: ${error.message}`);
-
+            users = users_r;
         }
+
+        const { data: acceptedTokens, error: errorTokens } = await this.supabase.from('token_list').select('address, digits, last_value');
+        if (errorTokens) throw new Error(`Error fetching tokens: ${errorTokens.message}`);
 
         for (const user of users) {
             const data = {
@@ -237,37 +238,50 @@ export class AlchemyService {
                 const response = await axios.post(url, data);
                 const balances = response.data.result.tokenBalances;
 
-                // Fetch accepted tokens and convert them to a Map for efficient lookups
-                const { data: acceptedTokens, error } = await this.supabase
-                    .from('token_list')
-                    .select("address, digits");
+                // Filter out only the accepted tokens based on their address
+                const filteredBalances = balances
+                    .filter((balance: any) =>
+                        acceptedTokens.some((token: any) => token.address.toLowerCase() === balance.contractAddress.toLowerCase())
+                    )
+                    .map((balance: any) => {
+                        // Find the matching token from acceptedTokens
+                        const token = acceptedTokens.find((token: any) => token.address.toLowerCase() === balance.contractAddress.toLowerCase());
 
-                if (error) throw new Error(`Error fetching accepted tokens: ${error.message}`);
+                        //Convert tokenbalance whose on hex to decimal
+                        balance.tokenBalance = parseInt(balance.tokenBalance, 16).toString();
 
-                const tokenMap = new Map(acceptedTokens.map(token => [token.address, token.digits]));
+                        // Convert balance to the correct number of tokens using the digits
+                        const tokenBalance = parseFloat(balance.tokenBalance) / Math.pow(10, token.digits);
 
-                // Process balances
-                const res = balances
-                    .filter(balance => tokenMap.has(balance.contractAddress)) // Filter only accepted tokens
-                    .map(balance => {
-                        const decimals = tokenMap.get(balance.contractAddress) as number;
-                        const tokenBalance = Number(BigInt(balance.tokenBalance)) / Math.pow(10, decimals);
+                        // Calculate the value of the token in USD (or any other currency)
+                        const tokenValue = tokenBalance * token.last_value;
 
                         return {
-                            token_address: balance.contractAddress,
+                            address: balance.contractAddress,
                             balance: tokenBalance,
+                            value: tokenValue,
                         };
                     });
 
                 // Update balances in the database
-                const { error: updateError } = await this.supabase.from('users').update({ balances: res }).eq('wallet_address', user.wallet_address);
-
+                const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
                 if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
+
+                let totalValue = 0;
+                for (const balance of filteredBalances) {
+                    totalValue += balance.value;
+                }
+
+                // Update the total value in the database
+                const { error: updateError2 } = await this.supabase.from('users').update({total_value: user.total_value.concat(totalValue) }).eq('wallet_address', user.wallet_address);
+                if (updateError2) throw new Error(`Error updating total value: ${updateError2.message}`);
 
             } catch (error) {
                 Logger.error('Error fetching or processing token balances:', error.message);
                 throw error;
             }
+            // Add delay to avoid overloading API
+            await this.delay(5000);
         }
     }
 }
