@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
+import { timestamp } from 'rxjs';
 
 
 @Injectable()
@@ -217,7 +218,7 @@ export class AlchemyService {
 
         if (address === "Empty") {
             // Fetch all users from the database
-            const { data: users_r, error } = await this.supabase.from('users').select('wallet_address, total_value');
+            const { data: users_r, error } = await this.supabase.from('users').select('wallet_address, total_value_historic');
             if (error) throw new Error(`Error fetching users: ${error.message}`);
             users = users_r;
         }
@@ -272,8 +273,7 @@ export class AlchemyService {
                     totalValue += balance.value;
                 }
 
-                // Update the total value in the database
-                const { error: updateError2 } = await this.supabase.from('users').update({total_value: user.total_value.concat(totalValue) }).eq('wallet_address', user.wallet_address);
+                const { error: updateError2 } = await this.supabase.from('users').update({total_value_historic: user.total_value_historic.concat({value:totalValue, timestamp: new Date()}) }).eq('wallet_address', user.wallet_address);
                 if (updateError2) throw new Error(`Error updating total value: ${updateError2.message}`);
 
             } catch (error) {
