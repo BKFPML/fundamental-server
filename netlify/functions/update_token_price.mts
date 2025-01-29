@@ -9,19 +9,13 @@ export default async (req: Request) => {
         const { next_run } = await req.json();
         console.log("Received event! Next invocation at:", next_run);
 
-        const data = await alchemyService.getTokenPriceInDollars();
-
-        if (!data) {
-            return new Response(
-                JSON.stringify({ error: 'Balance not found' }),
-                { status: 404, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
+        await alchemyService.updateTokenPriceInDollars();
 
         return new Response(
-            JSON.stringify({ data }),
+            JSON.stringify({ message: "Token prices updated successfully" }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
+
     } catch (error) {
         console.error('Error processing request:', error.message);
         return new Response(
@@ -32,5 +26,5 @@ export default async (req: Request) => {
 };
 
 export const config: Config = {
-    schedule: "@hourly",
+    schedule: "*/10 * * * *"
 };

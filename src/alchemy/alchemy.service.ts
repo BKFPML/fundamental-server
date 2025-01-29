@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
-import { log } from 'console';
 import { createClient } from '@supabase/supabase-js';
-import { interval } from 'rxjs';
-import { start } from 'repl';
+import { timestamp } from 'rxjs';
+
 
 @Injectable()
 export class AlchemyService {
@@ -22,91 +21,86 @@ export class AlchemyService {
         this.supabase = createClient(this.supabaseUrl, this.supabaseKey); // Création du client Supabase
     }
 
-    public async updateTokenBalances(address: string): Promise<any[]> {
-        const network = "base";
-        const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+    /*
 
-        const data = {
-            jsonrpc: '2.0',
-            method: 'alchemy_getTokenBalances',
-            params: [address],
-            id: 1,
-        };
+                Utility Functions
 
-        try {
-            // Fetch balances from Alchemy
-            const response = await axios.post(url, data);
-            const balances = response.data.result.tokenBalances;
+    */
 
-            // Fetch accepted tokens and convert them to a Map for efficient lookups
-            const { data: acceptedTokens, error } = await this.supabase
-                .from('token_list')
-                .select("address, digits");
+    async delay(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
 
-            if (error) throw new Error(`Error fetching accepted tokens: ${error.message}`);
+    /*
 
-            const tokenMap = new Map(acceptedTokens.map(token => [token.address, token.digits]));
+                Token APi Calls
 
-            // Process balances
-            const res = balances
-                .filter(balance => tokenMap.has(balance.contractAddress)) // Filter only accepted tokens
-                .map(balance => {
-                    const decimals = tokenMap.get(balance.contractAddress) as number;
-                    const tokenBalance = Number(BigInt(balance.tokenBalance)) / Math.pow(10, decimals);
+    */
 
-                    return {
-                        token_address: balance.contractAddress,
-                        balance: tokenBalance,
-                    };
+    async getTokenHistoricPrices(symbol: string = "WETH") {
+        const currentTime = new Date();
+        const intervals = [
+            { name: "yearly_value", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 }, // 364 / 3 = 121 value
+            { name: "monthly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 1 * 24 * 30 / 6 = 120 value
+            { name: "weekly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 }, // 1 * 24 * 7 = 168 value
+            { name: "daily_value", interval: "5m", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 2 },
+        ];
+
+        for (const i of intervals) {
+            const options = {
+                method: 'POST',
+                headers: { accept: 'application/json', 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    startTime: i.startTime,
+                    endTime: currentTime.toISOString(),
+                    interval: i.interval,
+                }),
+            };
+
+            await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
+                .then(async (res) => {
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        throw new Error(`API Error: ${res.status} ${errorText}`);
+                    }
+                    return res.json();
+                })
+                .then(async (res) => {
+                    if (res.data) {
+                        const data = res.data.filter((_, index) => index % i.data_keep === 0);
+    
+                        const symbolsToUpdate = symbol === "WETH" ? ["WETH", "ETH"] : [symbol];
+                        for (const sym of symbolsToUpdate) {
+                            const { error: updateError } = await this.supabase
+                                .from('token_list')
+                                .update({ [i.name]: data })
+                                .eq('symbol', sym);
+    
+                            if (updateError) {
+                                throw new Error(`Error updating token (${sym}): ${updateError.message}`);
+                            }
+                        }
+                    } else {
+                        throw new Error(`API returned no data for symbol: ${symbol}`);
+                    }
+                })
+                .catch((err) => {
+                    throw new Error(`Error fetching token history (${symbol}): ${err.message}`);
                 });
-
-            // Update balances in the database
-            const { error: updateError } = await this.supabase.from('users').update({ balances: res }).eq('wallet_address', address);
-
-            if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
-
-            return res;
-        } catch (error) {
-            Logger.error('Error fetching or processing token balances:', error.message);
-            throw error;
+            await this.delay(5000);
         }
     }
 
-    public async getEthBalance(address: string): Promise<string> {
-
-        const network = "base"
-        const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
-        const data = {
-            jsonrpc: "2.0",
-            method: "eth_getBalance",
-            params: [address, "latest"],
-            id: 1
-        };
-
-        try {
-            const response = await axios.post(Url, data);
-
-            const weiBalance = response.data.result;
-            const ethBalance = parseFloat(weiBalance) / 1e18;
-            Logger.log(`Balance for address ${address}: ${weiBalance} WEI`);
-            Logger.log(`Balance for address ${address}: ${ethBalance} ETH`);
-            return weiBalance;
-        } catch (error) {
-            Logger.log(error);
-            throw error;
-        }
-    }
-
-    async getTokenPriceInDollars(): Promise<any> {
+    public async updateTokenPriceInDollars() {
         try {
 
             // Fetch tokens from the database
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
-                .select('symbol, value');
+                .select('symbol, daily_value, weekly_value, monthly_value, yearly_value');
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) return [];
-
             // Prepare the symbols query string
             const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&');
             const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`;
@@ -123,119 +117,171 @@ export class AlchemyService {
 
             // Process each token price and update the database
             const updates = results.map(async tokenData => {
-
+                tokenData.prices = tokenData.prices.map((price: any) => ({
+                    value: price.value,
+                    timestamp: price.lastUpdatedAt
+                }));
                 // Find the token in the database by symbol previously fetched
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) return null; // Skip if no matching token found
 
                 const currentTime = new Date();
-                Logger.log(`Current time: ${currentTime}`);
-                Logger.log("Token value before slice:");
-                Logger.log(token);
-                if (new Date(token.value[0].timestamp).getTime() < new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).getTime()) {
-                    // If the last data point is older than 364 days
-                    token.value = token.value.slice(1); // No need to slice since we keep all data points
-                } else if (currentTime.getUTCHours() % 24 === 0) {
-                    // If the current hour is a multiple of 24 (midnight)
-                    token.value = [...token.value.slice(0, 50), ...token.value.slice(51)];
-                } else if (currentTime.getUTCHours() % 6 === 0) {
-                    // If the current hour is a multiple of 6
-                    token.value = [...token.value.slice(0, 70), ...token.value.slice(71)];
-                } else {
-                    // Remove the data point from 24 hours ago to keep data up-to-date
-                    token.value = [...token.value.slice(0, 95), ...token.value.slice(96)];
-                }
-                
-                Logger.log("Token value after slice:");
-                Logger.log(token);
-                const updatedValue = [
-                    ...(token.value || []),
-                    { value: tokenData.prices[0].value, timestamp: tokenData.prices[0].lastUpdatedAt },
-                ];
+                const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
-                // Update the token value in the database
+                if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
+                    const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ yearly_value: token.yearly_value.slice(1).concat(tokenData.prices) })
+                    .eq('symbol', tokenData.symbol);
+
+                    if (updateError) {
+                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    }
+                }
+
+                if (currentTime.getUTCHours() % 6 === 0 && currentTime.getUTCMinutes() === 0) {
+
+                    const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ monthly_value: token.monthly_value.slice(1).concat(tokenData.prices) })
+                    .eq('symbol', tokenData.symbol);
+
+                    if (updateError) {
+                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    }
+                }
+
+                if (currentTime.getUTCMinutes() === 0) {
+                    const { error: updateError } = await this.supabase
+                    .from('token_list')
+                    .update({ weekly_value: token.weekly_value.slice(1).concat(tokenData.prices) })
+                    .eq('symbol', tokenData.symbol);
+
+                    if (updateError) {
+                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    }
+                }
+
                 const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ value: updatedValue })
+                    .update({ daily_value: token.daily_value.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError) {
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                 }
 
-                return {
-                    value: tokenData.prices[0].value,
-                    timestamp: tokenData.prices[0].lastUpdatedAt,
-                };
-            });
+                const { error: updateError2 } = await this.supabase
+                    .from('token_list')
+                    .update({ last_value: tokenData.prices[0].value })
+                    .eq('symbol', tokenData.symbol);
 
-            // Wait for all updates to complete
-            return await Promise.all(updates);
+                if (updateError2) {
+                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
+                }
+
+            });
         } catch (error) {
             console.error('Error fetching or updating token prices:', error.message);
             throw error;
         }
     }
 
-    async getTokenHistoricPrices(symbol: string = "WETH"): Promise<any> {
-        let result: { value: string; timestamp: string }[] = [];
-        const seen = new Set<string>();
-    
-        const currentTime = new Date();
-        const intervals = [
-            { interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 7 }, // 364 days of daily data with 7 day step because of API limits only daily data is available not 7d interval
-            { interval: "1d", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
-            { interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 7 days of hourly data with 6 hour step because of API limits only hourly data is available not 6h interval
-            { interval: "1h", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 },
-        ];
-    
-        for (const i of intervals) {
+    async getEthBalance(address: string): Promise<string> {
 
-            const options = {
-                method: 'POST',
-                headers: { accept: 'application/json', 'content-type': 'application/json' },
-                body: JSON.stringify({
-                    symbol: symbol,
-                    startTime: i.startTime,
-                    endTime: currentTime.toISOString(),
-                    interval: i.interval,
-                }),
-            };
-    
-            await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
-                .then((res) => res.json())
-                .then((res) => {
-                    if (res.data) {
-                        let filteredData = res.data;
+        const network = "base"
+        const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+        const data = {
+            jsonrpc: "2.0",
+            method: "eth_getBalance",
+            params: [address, "latest"],
+            id: 1
+        };
 
-                        if (i.data_keep === 6) { 
-                            filteredData = res.data.filter((_item: any, index: number) =>new Date(res.data[index].timestamp).getUTCHours() % i.data_keep === 0);
-                        } else {
-                            filteredData = res.data.filter((_item: any, index: number) => index % i.data_keep === 0);
-                        }
+        try {
+            const response = await axios.post(Url, data);
 
-                        filteredData.forEach((item: { value: string; timestamp: string }) => { // loop through the data and only keep the first data point of each hour
-                            const identifier = `${item.timestamp.slice(0, 13)}`; // only keep the first 13 characters of the timestamp aka the date and hour
-                            if (!seen.has(identifier)) {
-                                seen.add(identifier);
-                                result.push(item);
-                            }
-                        });
-                    }
-                })
-                .catch((err) => {throw new Error(`Error fetching token history (${symbol}): ${err.message}`)});
+            const weiBalance = response.data.result;
+            const ethBalance = parseFloat(weiBalance) / 1e18;
+
+            return weiBalance;
+        } catch (error) {
+            Logger.log(error);
+            throw error;
         }
-    
-        result.sort((a, b) => {
-            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(); // sort by timestamp
-        });
-    
-        const { error: updateError } = await this.supabase.from('token_list').update({ value: result }).eq('symbol', symbol); // Update the token value in the database
-    
-        if (updateError) {
-            throw new Error(`Error updating token (${symbol}): ${updateError.message}`);
-        }
-    
-        return result;
     }
-}    
+
+    public async updateTokenBalances(address: string = "Empty") {
+        const network = "base";
+        const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
+        let users: any[] = address === "Empty" ? [] : [{ wallet_address: address }];
+
+        if (address === "Empty") {
+            // Fetch all users from the database
+            const { data: users_r, error } = await this.supabase.from('users').select('wallet_address, total_value_historic');
+            if (error) throw new Error(`Error fetching users: ${error.message}`);
+            users = users_r;
+        }
+
+        const { data: acceptedTokens, error: errorTokens } = await this.supabase.from('token_list').select('address, digits, last_value');
+        if (errorTokens) throw new Error(`Error fetching tokens: ${errorTokens.message}`);
+
+        for (const user of users) {
+            const data = {
+                jsonrpc: '2.0',
+                method: 'alchemy_getTokenBalances',
+                params: [user.wallet_address],
+                id: 1,
+            };
+
+            try {
+                // Fetch balances from Alchemy
+                const response = await axios.post(url, data);
+                const balances = response.data.result.tokenBalances;
+
+                // Filter out only the accepted tokens based on their address
+                const filteredBalances = balances
+                    .filter((balance: any) =>
+                        acceptedTokens.some((token: any) => token.address.toLowerCase() === balance.contractAddress.toLowerCase())
+                    )
+                    .map((balance: any) => {
+                        // Find the matching token from acceptedTokens
+                        const token = acceptedTokens.find((token: any) => token.address.toLowerCase() === balance.contractAddress.toLowerCase());
+
+                        //Convert tokenbalance whose on hex to decimal
+                        balance.tokenBalance = parseInt(balance.tokenBalance, 16).toString();
+
+                        // Convert balance to the correct number of tokens using the digits
+                        const tokenBalance = parseFloat(balance.tokenBalance) / Math.pow(10, token.digits);
+
+                        // Calculate the value of the token in USD (or any other currency)
+                        const tokenValue = tokenBalance * token.last_value;
+
+                        return {
+                            address: balance.contractAddress,
+                            balance: tokenBalance,
+                            value: tokenValue,
+                        };
+                    });
+
+                // Update balances in the database
+                const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
+                if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
+
+                let totalValue = 0;
+                for (const balance of filteredBalances) {
+                    totalValue += balance.value;
+                }
+
+                const { error: updateError2 } = await this.supabase.from('users').update({total_value_historic: user.total_value_historic.concat({value:totalValue, timestamp: new Date()}) }).eq('wallet_address', user.wallet_address);
+                if (updateError2) throw new Error(`Error updating total value: ${updateError2.message}`);
+
+            } catch (error) {
+                Logger.error('Error fetching or processing token balances:', error.message);
+                throw error;
+            }
+            // Add delay to avoid overloading API
+            await this.delay(5000);
+        }
+    }
+}
