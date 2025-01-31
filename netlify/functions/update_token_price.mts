@@ -9,10 +9,10 @@ export default async (req: Request) => {
         const { next_run } = await req.json();
         console.log("Received event! Next invocation at:", next_run);
 
-        await alchemyService.updateTokenPriceInDollars();
+        const {result} = await alchemyService.updateTokenPriceInDollars();
 
         return new Response(
-            JSON.stringify({ message: "Token prices updated successfully" }),
+            JSON.stringify({ message: "Token prices updated successfully", result }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
 

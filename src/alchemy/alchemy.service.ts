@@ -93,7 +93,7 @@ export class AlchemyService {
         }
     }
 
-    public async updateTokenPriceInDollars() : Promise<void> {
+    public async updateTokenPriceInDollars() : Promise<any> {
         try {
 
             // Fetch tokens from the database
@@ -183,7 +183,7 @@ export class AlchemyService {
                     Logger.log(updateError2);
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
                 }
-
+                return 0;
             });
         } catch (error) {
             console.error('Error fetching or updating token prices:', error.message);
