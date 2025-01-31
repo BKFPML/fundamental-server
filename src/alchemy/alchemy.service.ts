@@ -3,6 +3,7 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
 import { timestamp } from 'rxjs';
+import { log } from 'console';
 
 
 @Injectable()
@@ -37,7 +38,7 @@ export class AlchemyService {
 
     */
 
-    async getTokenHistoricPrices(symbol: string = "WETH") {
+    async getTokenHistoricPrices(symbol: string = "WETH"): Promise<void> {
         const currentTime = new Date();
         const intervals = [
             { name: "yearly_value", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 }, // 364 / 3 = 121 value
@@ -92,7 +93,7 @@ export class AlchemyService {
         }
     }
 
-    public async updateTokenPriceInDollars() {
+    public async updateTokenPriceInDollars() : Promise<void> {
         try {
 
             // Fetch tokens from the database
@@ -100,7 +101,7 @@ export class AlchemyService {
                 .from('token_list')
                 .select('symbol, daily_value, weekly_value, monthly_value, yearly_value');
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
-            if (!tokens || tokens.length === 0) return [];
+            if (!tokens || tokens.length === 0) return;
             // Prepare the symbols query string
             const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&');
             const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`;
@@ -116,7 +117,7 @@ export class AlchemyService {
             const results = response.data.data;
 
             // Process each token price and update the database
-            const updates = results.map(async tokenData => {
+            results.map(async tokenData => {
                 tokenData.prices = tokenData.prices.map((price: any) => ({
                     value: price.value,
                     timestamp: price.lastUpdatedAt
@@ -161,22 +162,25 @@ export class AlchemyService {
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                     }
                 }
-
+                Logger.log(tokenData.symbol);
+                Logger.log(tokenData.prices);
                 const { error: updateError } = await this.supabase
                     .from('token_list')
                     .update({ daily_value: token.daily_value.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError) {
+                    Logger.log(updateError);
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                 }
-
+                Logger.log(tokenData.prices[0].value);
                 const { error: updateError2 } = await this.supabase
                     .from('token_list')
                     .update({ last_value: tokenData.prices[0].value })
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError2) {
+                    Logger.log(updateError2);
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
                 }
 
@@ -211,7 +215,7 @@ export class AlchemyService {
         }
     }
 
-    public async updateTokenBalances(address: string = "Empty") {
+    public async updateTokenBalances(address: string = "Empty"): Promise<void> {
         const network = "base";
         const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
         let users: any[] = address === "Empty" ? [] : [{ wallet_address: address }];

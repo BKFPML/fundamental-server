@@ -78,7 +78,7 @@ export class FrankfurterService {
         }
     }
 
-    public async updateCurrencyPrice() {
+    public async updateCurrencyPrice(): Promise<void> {
         const {data: currencies, error} = await this.supabase.from('exchange_rate').select('symbol, value');
         if (error) throw new Error(`Error fetching currencies: ${error.message}`);
 
