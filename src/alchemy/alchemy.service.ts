@@ -251,9 +251,9 @@ export class AlchemyService {
                     .map((balance: any) => {
                         // Find the matching token from acceptedTokens
                         const token = acceptedTokens.find((token: any) => token.address.toLowerCase() === balance.contractAddress.toLowerCase());
-                        const tokenBalanceWei = balance.tokenBalance;
                         //Convert tokenbalance whose on hex to decimal
                         balance.tokenBalance = parseInt(balance.tokenBalance, 16).toString();
+                        const tokenBalanceWei = balance.tokenBalance;
 
                         // Convert balance to the correct number of tokens using the digits
                         const tokenBalance = parseFloat(balance.tokenBalance) / Math.pow(10, token.digits);
