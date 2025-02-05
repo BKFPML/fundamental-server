@@ -41,10 +41,10 @@ export class AlchemyService {
     async getTokenHistoricPrices(symbol: string = "WETH"): Promise<void> {
         const currentTime = new Date();
         const intervals = [
-            { name: "yearly_value", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 }, // 364 / 3 = 121 value
-            { name: "monthly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 1 * 24 * 30 / 6 = 120 value
-            { name: "weekly_value", interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 }, // 1 * 24 * 7 = 168 value
-            { name: "daily_value", interval: "5m", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 2 },
+            { name: "yearly_values", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 }, // 364 / 3 = 121 value
+            { name: "monthly_values", interval: "1h", startTime: new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 6 }, // 1 * 24 * 30 / 6 = 120 value
+            { name: "weekly_values", interval: "1h", startTime: new Date(currentTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 1 }, // 1 * 24 * 7 = 168 value
+            { name: "daily_values", interval: "5m", startTime: new Date(currentTime.getTime() - 24 * 60 * 60 * 1000).toISOString(), data_keep: 2 },
         ];
 
         for (const i of intervals) {
@@ -69,7 +69,12 @@ export class AlchemyService {
                 })
                 .then(async (res) => {
                     if (res.data) {
-                        const data = res.data.filter((_, index) => index % i.data_keep === 0);
+                        let data = res.data.filter((_, index) => index % i.data_keep === 0);
+
+                        data = data.map((item: { value: number; timestamp: any }) => ({
+                            value: item.value,
+                            label: item.timestamp
+                        }));
     
                         const symbolsToUpdate = symbol === "WETH" ? ["WETH", "ETH"] : [symbol];
                         for (const sym of symbolsToUpdate) {
@@ -99,7 +104,7 @@ export class AlchemyService {
             // Fetch tokens from the database
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
-                .select('symbol, daily_value, weekly_value, monthly_value, yearly_value');
+                .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) return;
             // Prepare the symbols query string
@@ -120,7 +125,7 @@ export class AlchemyService {
             results.map(async tokenData => {
                 tokenData.prices = tokenData.prices.map((price: any) => ({
                     value: price.value,
-                    timestamp: price.lastUpdatedAt
+                    label: price.lastUpdatedAt
                 }));
                 // Find the token in the database by symbol previously fetched
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
@@ -132,7 +137,7 @@ export class AlchemyService {
                 if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
                     const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ yearly_value: token.yearly_value.slice(1).concat(tokenData.prices) })
+                    .update({ yearly_values: token.yearly_values.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
@@ -252,8 +257,8 @@ export class AlchemyService {
                         // Find the matching token from acceptedTokens
                         const token = acceptedTokens.find((token: any) => token.address.toLowerCase() === balance.contractAddress.toLowerCase());
                         //Convert tokenbalance whose on hex to decimal
+                        const tokenBalanceWei = parseInt(balance.tokenBalance, 16);
                         balance.tokenBalance = parseInt(balance.tokenBalance, 16).toString();
-                        const tokenBalanceWei = balance.tokenBalance;
 
                         // Convert balance to the correct number of tokens using the digits
                         const tokenBalance = parseFloat(balance.tokenBalance) / Math.pow(10, token.digits);
