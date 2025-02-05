@@ -149,7 +149,7 @@ export class AlchemyService {
 
                     const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ monthly_value: token.monthly_value.slice(1).concat(tokenData.prices) })
+                    .update({ monthly_values: token.monthly_values.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
@@ -160,7 +160,7 @@ export class AlchemyService {
                 if (currentTime.getUTCMinutes() === 0) {
                     const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ weekly_value: token.weekly_value.slice(1).concat(tokenData.prices) })
+                    .update({ weekly_values: token.weekly_values.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
@@ -171,7 +171,7 @@ export class AlchemyService {
                 Logger.log(tokenData.prices);
                 const { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ daily_value: token.daily_value.slice(1).concat(tokenData.prices) })
+                    .update({ daily_values: token.daily_values.slice(1).concat(tokenData.prices) })
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError) {
