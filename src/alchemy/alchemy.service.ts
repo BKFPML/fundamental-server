@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
 import { timestamp } from 'rxjs';
 import { log } from 'console';
+import { parse } from 'path';
 
 
 @Injectable()
@@ -71,8 +72,8 @@ export class AlchemyService {
                     if (res.data) {
                         let data = res.data.filter((_, index) => index % i.data_keep === 0);
 
-                        data = data.map((item: { value: number; timestamp: any }) => ({
-                            value: item.value,
+                        data = data.map((item: { value: any; timestamp: any }) => ({
+                            value: parseFloat(item.value),
                             label: item.timestamp
                         }));
     
@@ -124,7 +125,7 @@ export class AlchemyService {
             // Process each token price and update the database
             results.map(async tokenData => {
                 tokenData.prices = tokenData.prices.map((price: any) => ({
-                    value: price.value,
+                    value: parseFloat(price.value),
                     label: price.lastUpdatedAt
                 }));
                 // Find the token in the database by symbol previously fetched
