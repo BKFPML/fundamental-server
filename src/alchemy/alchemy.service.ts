@@ -207,8 +207,8 @@ export class AlchemyService {
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
                 }
                 Logger.log("Finish")
-                return 0;
             });
+            return 0;
         } catch (error) {
             console.error('Error fetching or updating token prices:', error.message);
             throw error;
