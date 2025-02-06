@@ -150,10 +150,15 @@ export class AlchemyService {
                 const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
                 if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
+                    
+                    const updatedYearlyValues = [...token.yearly_values]; // cop
+                    updatedYearlyValues.shift(); // Remove first element
+                    updatedYearlyValues.push(tokenData.prices); // Add new element
                     const { error: updateError } = await this.supabase
-                    .from('token_list')
-                    .update({ yearly_values: token.yearly_values.shift().push(tokenData.prices) })
-                    .eq('symbol', tokenData.symbol);
+                        .from('token_list')
+                        .update({ yearly_values: updatedYearlyValues })
+                        .eq('symbol', tokenData.symbol);
+
 
                     if (updateError) {
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
@@ -162,10 +167,13 @@ export class AlchemyService {
 
                 if (currentTime.getUTCHours() % 6 === 0 && currentTime.getUTCMinutes() === 0) {
 
+                    const updatedMontlyValues = [...token.monthly_values]; // cop
+                    updatedMontlyValues.shift(); // Remove first element
+                    updatedMontlyValues.push(tokenData.prices); // Add new element
                     const { error: updateError } = await this.supabase
-                    .from('token_list')
-                    .update({ monthly_values: token.monthly_values.shift().push(tokenData.prices)  })
-                    .eq('symbol', tokenData.symbol);
+                        .from('token_list')
+                        .update({ monthly_values: updatedMontlyValues })
+                        .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
@@ -173,10 +181,14 @@ export class AlchemyService {
                 }
 
                 if (currentTime.getUTCMinutes() === 0) {
+                    
+                    const updatedWeeklyValues = [...token.weekly_values]; // cop
+                    updatedWeeklyValues.shift(); // Remove first element
+                    updatedWeeklyValues.push(tokenData.prices); // Add new element
                     const { error: updateError } = await this.supabase
-                    .from('token_list')
-                    .update({ weekly_values: token.weekly_values.shift().push(tokenData.prices)  })
-                    .eq('symbol', tokenData.symbol);
+                        .from('token_list')
+                        .update({ weekly_values: updatedWeeklyValues })
+                        .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
@@ -184,7 +196,7 @@ export class AlchemyService {
                 }
                 Logger.log(tokenData.symbol);
                 Logger.log(tokenData.prices);
-                const updatedDailyValues = [...token.daily_values]; // Copy array
+                const updatedDailyValues = [...token.daily_values]; // cop
                 updatedDailyValues.shift(); // Remove first element
                 updatedDailyValues.push(tokenData.prices); // Add new element
                 const { error: updateError } = await this.supabase
