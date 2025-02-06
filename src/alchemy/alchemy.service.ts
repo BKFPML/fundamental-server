@@ -206,6 +206,7 @@ export class AlchemyService {
                     Logger.log(updateError2);
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
                 }
+                Logger.log("Finish")
                 return 0;
             });
         } catch (error) {
