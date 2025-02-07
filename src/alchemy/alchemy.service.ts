@@ -207,7 +207,9 @@ export class AlchemyService {
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
                     .eq('symbol', tokenData.symbol);
-
+                Logger.log(updateError);
+                Logger.log(tokenData.prices[0].value);
+                
                 if (updateError) {
                     Logger.log(updateError);
                     throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
