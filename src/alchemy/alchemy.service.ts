@@ -101,10 +101,11 @@ export class AlchemyService {
 
     public async updateTokenPriceInDollars() : Promise<void> {
         try {
+            Logger.log(process.env.SUPABASE_URL)
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
-
+            
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) throw new Error('No tokens found in the database');
 
