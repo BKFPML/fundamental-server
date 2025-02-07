@@ -5,21 +5,29 @@ import { AlchemyService } from '../../src/alchemy/alchemy.service';
 const alchemyService = new AlchemyService(new ConfigService());
 
 export default async (req: Request) => {
+    const { next_run } = await req.json();
+    console.log("Received event! Next invocation at:", next_run);
+
     try {
-        const { next_run } = await req.json();
-        console.log("Received event! Next invocation at:", next_run);
-
-        const {result} = await alchemyService.updateTokenPriceInDollars();
+        console.log("Starting token price update...");
+        await alchemyService.updateTokenPriceInDollars();
+        console.log("Token price update completed.");
 
         return new Response(
-            JSON.stringify({ message: "Token prices updated successfully", result }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
+            JSON.stringify({ message: "Token prices updated successfully" }),
+            { status: 200, headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+            }
         );
+    } catch (e) {
+        console.error(e);
 
-    } catch (error) {
-        console.error('Error processing request:', error.message);
         return new Response(
-            JSON.stringify({ error: 'Internal Server Error' }),
+            JSON.stringify({ error: "Failed to update token prices" }),
             { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
     }

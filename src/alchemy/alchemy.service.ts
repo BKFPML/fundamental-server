@@ -99,18 +99,17 @@ export class AlchemyService {
         }
     }
 
-    public async updateTokenPriceInDollars() : Promise<any> {
+    public async updateTokenPriceInDollars() : Promise<void> {
         try {
-
-            // Fetch tokens from the database
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
+
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
-            if (!tokens || tokens.length === 0) return;
-            // Prepare the symbols query string
-            const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&');
-            const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`;
+            if (!tokens || tokens.length === 0) throw new Error('No tokens found in the database');
+
+            const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&'); // Create query string
+            const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`; // Create URL
 
             // Fetch token prices
             const response = await axios.get(url, {
@@ -120,37 +119,26 @@ export class AlchemyService {
                 },
             });
 
-            if (!response.data.data) {  // Check if the response contains data
-                throw new Error('No data found in the response');
-            }
-            
-            if (response.data.data.length === 0) {  // Check if the response contains data
-                Logger.log(response.data);
-                throw new Error('No data found in the response');
-            }
+            if (!response.data.data) throw new Error('No data found in the response');
+            if (response.data.data.length === 0) throw new Error('No data found in the response');
+            if (response.data.errors) throw new Error(`API Error: ${response.data.errors}`);
 
-            if (response.data.errors) {  // Check if the response contains errors
-                Logger.log(response.data.errors);
-                throw new Error(`API Error: ${response.data.errors}`);
-            }
-            Logger.log(response.data.data);
-            const results = response.data.data;
-            Logger.log(results);
-            // Process each token price and update the database
+            const results: any[] = response.data.data;
+
             results.map(async tokenData => {
                 tokenData.prices = tokenData.prices.map((price: any) => ({
                     value: parseFloat(price.value),
                     label: price.lastUpdatedAt
                 }));
-                // Find the token in the database by symbol previously fetched
+
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
-                if (!token) return null; // Skip if no matching token found
+                if (!token) throw new Error(`Token not found in the database: ${tokenData.symbol}`);
 
                 const currentTime = new Date();
                 const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
                 if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
-                    
+
                     const updatedYearlyValues = [...token.yearly_values]; // cop
                     updatedYearlyValues.shift(); // Remove first element
                     updatedYearlyValues.push(tokenData.prices[0]); // Add new element
@@ -160,75 +148,59 @@ export class AlchemyService {
                         .update({ yearly_values: updatedYearlyValues })
                         .eq('symbol', tokenData.symbol);
 
-
-                    if (updateError) {
-                        Logger.log(updateError);
-                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-                    }
+                    if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                 }
 
                 if (currentTime.getUTCHours() % 6 === 0 && currentTime.getUTCMinutes() === 0) {
 
-                    const updatedMontlyValues = [...token.monthly_values]; // cop
-                    updatedMontlyValues.shift(); // Remove first element
-                    updatedMontlyValues.push(tokenData.prices[0]); // Add new element
+                    const updatedMontlyValues = [...token.monthly_values];
+                    updatedMontlyValues.shift();
+                    updatedMontlyValues.push(tokenData.prices[0]);
+
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ monthly_values: updatedMontlyValues })
                         .eq('symbol', tokenData.symbol);
 
-                    if (updateError) {
-                        Logger.log(updateError);
-                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-                    }
+                    if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+
                 }
 
                 if (currentTime.getUTCMinutes() === 0) {
-                    
-                    const updatedWeeklyValues = [...token.weekly_values]; // cop
-                    updatedWeeklyValues.shift(); // Remove first element
-                    updatedWeeklyValues.push(tokenData.prices[0]); // Add new element
+
+                    const updatedWeeklyValues = [...token.weekly_values];
+                    updatedWeeklyValues.shift();
+                    updatedWeeklyValues.push(tokenData.prices[0]);
+
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ weekly_values: updatedWeeklyValues })
                         .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
-                        Logger.log(updateError);
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                     }
                 }
-                Logger.log(tokenData.symbol);
-                Logger.log(tokenData.prices);
-                const updatedDailyValues = [...token.daily_values]; // cop
-                updatedDailyValues.shift(); // Remove first element
-                updatedDailyValues.push(tokenData.prices[0]); // Add new element
-                const { error: updateError } = await this.supabase
+
+                const updatedDailyValues = [...token.daily_values];
+                updatedDailyValues.shift();
+                updatedDailyValues.push(tokenData.prices[0]);
+
+                let { error: updateError } = await this.supabase
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
                     .eq('symbol', tokenData.symbol);
-                Logger.log(updateError);
-                Logger.log(tokenData.prices[0].value);
-                
-                if (updateError) {
-                    Logger.log(updateError);
-                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-                }
-                Logger.log(tokenData.prices[0].value);
-                const { error: updateError2 } = await this.supabase
+
+                if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+
+                updateError = await this.supabase
                     .from('token_list')
                     .update({ last_value: tokenData.prices[0].value })
                     .eq('symbol', tokenData.symbol);
 
-                if (updateError2) {
-                    Logger.log(updateError2);
-                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError2.message}`);
-                }
-                Logger.log("Finish")
+                if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${error.message}`);
             });
-            return 0;
         } catch (error) {
-            console.error('Error fetching or updating token prices:', error.message);
             throw error;
         }
     }
