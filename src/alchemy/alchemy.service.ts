@@ -153,7 +153,8 @@ export class AlchemyService {
                     
                     const updatedYearlyValues = [...token.yearly_values]; // cop
                     updatedYearlyValues.shift(); // Remove first element
-                    updatedYearlyValues.push(tokenData.prices); // Add new element
+                    updatedYearlyValues.push(tokenData.prices[0]); // Add new element
+
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ yearly_values: updatedYearlyValues })
@@ -161,6 +162,7 @@ export class AlchemyService {
 
 
                     if (updateError) {
+                        Logger.log(updateError);
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                     }
                 }
@@ -169,13 +171,14 @@ export class AlchemyService {
 
                     const updatedMontlyValues = [...token.monthly_values]; // cop
                     updatedMontlyValues.shift(); // Remove first element
-                    updatedMontlyValues.push(tokenData.prices); // Add new element
+                    updatedMontlyValues.push(tokenData.prices[0]); // Add new element
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ monthly_values: updatedMontlyValues })
                         .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
+                        Logger.log(updateError);
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                     }
                 }
@@ -184,13 +187,14 @@ export class AlchemyService {
                     
                     const updatedWeeklyValues = [...token.weekly_values]; // cop
                     updatedWeeklyValues.shift(); // Remove first element
-                    updatedWeeklyValues.push(tokenData.prices); // Add new element
+                    updatedWeeklyValues.push(tokenData.prices[0]); // Add new element
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ weekly_values: updatedWeeklyValues })
                         .eq('symbol', tokenData.symbol);
 
                     if (updateError) {
+                        Logger.log(updateError);
                         throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                     }
                 }
@@ -198,7 +202,7 @@ export class AlchemyService {
                 Logger.log(tokenData.prices);
                 const updatedDailyValues = [...token.daily_values]; // cop
                 updatedDailyValues.shift(); // Remove first element
-                updatedDailyValues.push(tokenData.prices); // Add new element
+                updatedDailyValues.push(tokenData.prices[0]); // Add new element
                 const { error: updateError } = await this.supabase
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
