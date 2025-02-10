@@ -101,7 +101,10 @@ export class AlchemyService {
 
     public async updateTokenPriceInDollars(): Promise<void> {
         try {
-            Logger.log(process.env.SUPABASE_URL);
+            const currentTime = new Date();
+            const nb_minutes = currentTime.getUTCMinutes();
+            const nb_hours = currentTime.getUTCHours();
+            const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
@@ -136,67 +139,45 @@ export class AlchemyService {
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) throw new Error(`Token not found in the database: ${tokenData.symbol}`);
 
-                const currentTime = new Date();
-                const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+                const updates: any = { last_value: tokenData.prices[0].value };
 
-                if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
+                // Update Yearly values every 3 days
+                if (dayOfYear % 3 && nb_hours === 0 && nb_minutes === 0) {
                     const updatedYearlyValues = [...token.yearly_values];
                     updatedYearlyValues.shift();
                     updatedYearlyValues.push(tokenData.prices[0]);
-
-                    const { error: updateError } = await this.supabase
-                        .from('token_list')
-                        .update({ yearly_values: updatedYearlyValues })
-                        .eq('symbol', tokenData.symbol);
-
-                    if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    updates.yearly_values = updatedYearlyValues;
                 }
 
-                if (currentTime.getUTCHours() % 6 === 0 && currentTime.getUTCMinutes() === 0) {
+                // Update Monthly values every 6 hours
+                if (nb_hours % 6 === 0 && nb_minutes === 0) {
                     const updatedMontlyValues = [...token.monthly_values];
                     updatedMontlyValues.shift();
                     updatedMontlyValues.push(tokenData.prices[0]);
-
-                    const { error: updateError } = await this.supabase
-                        .from('token_list')
-                        .update({ monthly_values: updatedMontlyValues })
-                        .eq('symbol', tokenData.symbol);
-
-                    if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+                    updates.monthly_values = updatedMontlyValues;
                 }
 
-                if (currentTime.getUTCMinutes() === 0) {
+                // Update Weekly values every hour
+                if (nb_minutes === 0) {
                     const updatedWeeklyValues = [...token.weekly_values];
                     updatedWeeklyValues.shift();
                     updatedWeeklyValues.push(tokenData.prices[0]);
-
-                    const { error: updateError } = await this.supabase
-                        .from('token_list')
-                        .update({ weekly_values: updatedWeeklyValues })
-                        .eq('symbol', tokenData.symbol);
-
-                    if (updateError) {
-                        throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-                    }
+                    updates.weekly_values = updatedWeeklyValues;
                 }
 
+                // Update Daily values every 10 minutes
                 const updatedDailyValues = [...token.daily_values];
                 updatedDailyValues.shift();
                 updatedDailyValues.push(tokenData.prices[0]);
+                updates.daily_values = updatedDailyValues;
 
+                // Update token in the database
                 let { error: updateError } = await this.supabase
                     .from('token_list')
-                    .update({ daily_values: updatedDailyValues })
+                    .update(updates)
                     .eq('symbol', tokenData.symbol);
 
                 if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-
-                const { error: lastValueError } = await this.supabase
-                    .from('token_list')
-                    .update({ last_value: tokenData.prices[0].value })
-                    .eq('symbol', tokenData.symbol);
-
-                if (lastValueError) throw new Error(`Error updating token (${tokenData.symbol}): ${lastValueError.message}`);
             }
         } catch (error) {
             throw error;
