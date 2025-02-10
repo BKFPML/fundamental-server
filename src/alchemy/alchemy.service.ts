@@ -190,7 +190,7 @@ export class AlchemyService {
                 console.log(`🔍 Mise à jour daily_values pour ${tokenData.symbol}...`);
                 console.log("Données envoyées :", JSON.stringify(updatedDailyValues, null, 2));
 
-                const { error: updateError, data } = await this.supabase
+                let { error: updateError, data } = await this.supabase
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
                     .eq('symbol', tokenData.symbol)
