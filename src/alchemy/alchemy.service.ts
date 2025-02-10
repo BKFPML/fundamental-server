@@ -143,7 +143,7 @@ export class AlchemyService {
                     const updatedYearlyValues = [...token.yearly_values]; // cop
                     updatedYearlyValues.shift(); // Remove first element
                     updatedYearlyValues.push(tokenData.prices[0]); // Add new element
-
+                    
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ yearly_values: updatedYearlyValues })
@@ -187,10 +187,21 @@ export class AlchemyService {
                 updatedDailyValues.shift();
                 updatedDailyValues.push(tokenData.prices[0]);
 
-                let { error: updateError } = await this.supabase
+                console.log(`🔍 Mise à jour daily_values pour ${tokenData.symbol}...`);
+                console.log("Données envoyées :", JSON.stringify(updatedDailyValues, null, 2));
+
+                const { error: updateError, data } = await this.supabase
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
-                    .eq('symbol', tokenData.symbol);
+                    .eq('symbol', tokenData.symbol)
+                    .select();  // Permet de récupérer les données mises à jour
+
+                if (updateError) {
+                    console.error(`Erreur lors de la mise à jour de ${tokenData.symbol} :`, updateError);
+                } else {
+                    console.log(`Mise à jour réussie pour ${tokenData.symbol}`);
+                    console.log("Données mises à jour :", data);
+                }
 
                 if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
 
