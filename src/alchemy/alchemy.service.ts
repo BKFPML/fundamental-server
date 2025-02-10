@@ -99,13 +99,13 @@ export class AlchemyService {
         }
     }
 
-    public async updateTokenPriceInDollars() : Promise<void> {
+    public async updateTokenPriceInDollars(): Promise<void> {
         try {
-            Logger.log(process.env.SUPABASE_URL)
+            Logger.log(process.env.SUPABASE_URL);
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
-            
+
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) throw new Error('No tokens found in the database');
 
@@ -126,7 +126,8 @@ export class AlchemyService {
 
             const results: any[] = response.data.data;
 
-            results.map(async tokenData => {
+            for (const tokenData of results) {
+
                 tokenData.prices = tokenData.prices.map((price: any) => ({
                     value: parseFloat(price.value),
                     label: price.lastUpdatedAt
@@ -139,11 +140,10 @@ export class AlchemyService {
                 const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
                 if (dayOfYear % 3 && currentTime.getUTCHours() === 0 && currentTime.getUTCMinutes() === 0) {
+                    const updatedYearlyValues = [...token.yearly_values];
+                    updatedYearlyValues.shift();
+                    updatedYearlyValues.push(tokenData.prices[0]);
 
-                    const updatedYearlyValues = [...token.yearly_values]; // cop
-                    updatedYearlyValues.shift(); // Remove first element
-                    updatedYearlyValues.push(tokenData.prices[0]); // Add new element
-                    
                     const { error: updateError } = await this.supabase
                         .from('token_list')
                         .update({ yearly_values: updatedYearlyValues })
@@ -153,7 +153,6 @@ export class AlchemyService {
                 }
 
                 if (currentTime.getUTCHours() % 6 === 0 && currentTime.getUTCMinutes() === 0) {
-
                     const updatedMontlyValues = [...token.monthly_values];
                     updatedMontlyValues.shift();
                     updatedMontlyValues.push(tokenData.prices[0]);
@@ -164,11 +163,9 @@ export class AlchemyService {
                         .eq('symbol', tokenData.symbol);
 
                     if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-
                 }
 
                 if (currentTime.getUTCMinutes() === 0) {
-
                     const updatedWeeklyValues = [...token.weekly_values];
                     updatedWeeklyValues.shift();
                     updatedWeeklyValues.push(tokenData.prices[0]);
@@ -187,36 +184,30 @@ export class AlchemyService {
                 updatedDailyValues.shift();
                 updatedDailyValues.push(tokenData.prices[0]);
 
-                console.log(`🔍 Mise à jour daily_values pour ${tokenData.symbol}...`);
-                console.log("Données envoyées :", JSON.stringify(updatedDailyValues, null, 2));
-
-                let { error: updateError, data } = await this.supabase
+                let { error: updateError } = await this.supabase
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
-                    .eq('symbol', tokenData.symbol)
-                    .select();  // Permet de récupérer les données mises à jour
-
+                    .eq('symbol', tokenData.symbol);
+                console.log("Error: ");
+                console.log(updateError);
+                
                 if (updateError) {
-                    console.error(`Erreur lors de la mise à jour de ${tokenData.symbol} :`, updateError);
-                } else {
-                    console.log(`Mise à jour réussie pour ${tokenData.symbol}`);
-                    console.log("Données mises à jour :", data);
+                    console.log(updateError);
+                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
                 }
 
-                if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
+            //     const { error: lastValueError } = await this.supabase
+            //         .from('token_list')
+            //         .update({ last_value: tokenData.prices[0].value })
+            //         .eq('symbol', tokenData.symbol);
 
-                updateError = await this.supabase
-                    .from('token_list')
-                    .update({ last_value: tokenData.prices[0].value })
-                    .eq('symbol', tokenData.symbol);
-
-                if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${error.message}`);
-            });
+            //     if (lastValueError) throw new Error(`Error updating token (${tokenData.symbol}): ${lastValueError.message}`);
+            }
         } catch (error) {
             throw error;
         }
     }
-
+    
     async getEthBalance(address: string): Promise<string> {
 
         const network = "base"
