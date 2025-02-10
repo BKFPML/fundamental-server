@@ -188,26 +188,21 @@ export class AlchemyService {
                     .from('token_list')
                     .update({ daily_values: updatedDailyValues })
                     .eq('symbol', tokenData.symbol);
-                console.log("Error: ");
-                console.log(updateError);
-                
-                if (updateError) {
-                    console.log(updateError);
-                    throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
-                }
 
-            //     const { error: lastValueError } = await this.supabase
-            //         .from('token_list')
-            //         .update({ last_value: tokenData.prices[0].value })
-            //         .eq('symbol', tokenData.symbol);
+                if (updateError) throw new Error(`Error updating token (${tokenData.symbol}): ${updateError.message}`);
 
-            //     if (lastValueError) throw new Error(`Error updating token (${tokenData.symbol}): ${lastValueError.message}`);
+                const { error: lastValueError } = await this.supabase
+                    .from('token_list')
+                    .update({ last_value: tokenData.prices[0].value })
+                    .eq('symbol', tokenData.symbol);
+
+                if (lastValueError) throw new Error(`Error updating token (${tokenData.symbol}): ${lastValueError.message}`);
             }
         } catch (error) {
             throw error;
         }
     }
-    
+
     async getEthBalance(address: string): Promise<string> {
 
         const network = "base"
