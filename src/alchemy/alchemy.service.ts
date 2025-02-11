@@ -105,6 +105,11 @@ export class AlchemyService {
             const nb_minutes = currentTime.getUTCMinutes();
             const nb_hours = currentTime.getUTCHours();
             const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+
+            console.log("Current minutes: ", nb_minutes);
+            console.log("Current hours: ", nb_hours);
+            console.log("Current day of year: ", dayOfYear);
+
             const { data: tokens, error } = await this.supabase
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
