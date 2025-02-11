@@ -239,7 +239,10 @@ export class AlchemyService {
             try {
                 // Fetch balances from Alchemy
                 const response = await axios.post(url, data);
+                console.log(response.data);
+                if (!response.data.result) throw new Error('No result found in the response');
                 const balances = response.data.result.tokenBalances;
+                if (!balances) throw new Error('No balances found in the response');
 
                 // Filter out only the accepted tokens based on their address
                 const filteredBalances = balances
@@ -265,6 +268,8 @@ export class AlchemyService {
                             value: tokenValue,
                         };
                     });
+
+                Logger.log(`Filtered balances: ${JSON.stringify(filteredBalances)}`);
 
                 // Update balances in the database
                 const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
