@@ -11,10 +11,10 @@ export default async (req: Request) => {
 
         await frankfurterService.updateCurrencyPrice();
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: "Currency prices updated successfully" }),
-        };
+        return new Response(
+            JSON.stringify({ message: "Currency prices updated successfully"}),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
 
     } catch (error) {
         console.error('Error processing request:', error.message);
