@@ -150,7 +150,7 @@ export class AlchemyService {
                 if (dayOfYear % 3 && nb_hours === 0 && nb_minutes === 0) {
                     const updatedYearlyValues = [...token.yearly_values];
                     updatedYearlyValues.shift();
-                    updatedYearlyValues.push(tokenData.prices[0]);
+                    updatedYearlyValues.push({ ...tokenData.prices[0] });
                     updates.yearly_values = updatedYearlyValues;
                 }
 
@@ -158,7 +158,7 @@ export class AlchemyService {
                 if (nb_hours % 6 === 0 && nb_minutes === 0) {
                     const updatedMontlyValues = [...token.monthly_values];
                     updatedMontlyValues.shift();
-                    updatedMontlyValues.push(tokenData.prices[0]);
+                    updatedMontlyValues.push({ ...tokenData.prices[0] });
                     updates.monthly_values = updatedMontlyValues;
                 }
 
@@ -166,14 +166,14 @@ export class AlchemyService {
                 if (nb_minutes === 0) {
                     const updatedWeeklyValues = [...token.weekly_values];
                     updatedWeeklyValues.shift();
-                    updatedWeeklyValues.push(tokenData.prices[0]);
+                    updatedWeeklyValues.push({ ...tokenData.prices[0] });
                     updates.weekly_values = updatedWeeklyValues;
                 }
 
                 // Update Daily values every 10 minutes
                 const updatedDailyValues = [...token.daily_values];
                 updatedDailyValues.shift();
-                updatedDailyValues.push(tokenData.prices[0]);
+                updatedDailyValues.push({ ...tokenData.prices[0] });
                 updates.daily_values = updatedDailyValues;
 
                 // Update token in the database
