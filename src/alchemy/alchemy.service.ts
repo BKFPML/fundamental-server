@@ -287,8 +287,6 @@ export class AlchemyService {
                 Logger.error('Error fetching or processing token balances:', error.message);
                 throw error;
             }
-            // Add delay to avoid overloading API
-            await this.delay(5000);
         }
     }
 }
