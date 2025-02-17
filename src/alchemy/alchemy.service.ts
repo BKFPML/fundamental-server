@@ -216,13 +216,18 @@ export class AlchemyService {
     public async updateTokenBalances(address: string = "Empty"): Promise<void> {
         const network = "base";
         const url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
-        let users: any[] = address === "Empty" ? [] : [{ wallet_address: address }];
+        let users: any[] = [];
 
         if (address === "Empty") {
             // Fetch all users from the database
             const { data: users_r, error } = await this.supabase.from('users').select('wallet_address, total_value_historic');
             if (error) throw new Error(`Error fetching users: ${error.message}`);
             users = users_r;
+        } else {
+            // Fetch only the user with the provided address
+            const { data: user_r, error } = await this.supabase.from('users').select('wallet_address, total_value_historic').eq('wallet_address', address);
+            if (error) throw new Error(`Error fetching user: ${error.message}`);
+            users = user_r;
         }
 
         const { data: acceptedTokens, error: errorTokens } = await this.supabase.from('token_list').select('address, digits, last_value');
