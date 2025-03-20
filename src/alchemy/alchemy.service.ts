@@ -189,7 +189,7 @@ export class AlchemyService {
         }
     }
 
-    async getEthBalance(address: string): Promise<string> {
+    async getEthBalance(address: string): Promise<any> {
 
         const network = "base"
         const Url = `https://${network}-mainnet.g.alchemy.com/v2/${this.apiKey}`;
@@ -202,11 +202,15 @@ export class AlchemyService {
 
         try {
             const response = await axios.post(Url, data);
-
-            const weiBalance = response.data.result;
-            const ethBalance = parseFloat(weiBalance) / 1e18;
-
-            return weiBalance;
+            const tokenBalanceWei = parseInt(response.data.result, 16);
+            const tokenBalance = parseFloat(tokenBalanceWei.toString()) / Math.pow(10, 18); // Convert to Ether
+            const tokenValue = tokenBalance * 2000; // Assuming the value of ETH is 2000 USD for example 
+            const tokenBalanceInUSD = {
+                address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                balance: tokenBalanceWei,
+                value: tokenValue,
+            };
+            return tokenBalanceInUSD;
         } catch (error) {
             Logger.log(error);
             throw error;
@@ -273,6 +277,9 @@ export class AlchemyService {
                             value: tokenValue,
                         };
                     });
+
+                const tokenBalanceWei = this.getEthBalance(user.wallet_address);
+                filteredBalances.push(tokenBalanceWei);
 
                 Logger.log(`Filtered balances: ${JSON.stringify(filteredBalances)}`);
 

@@ -19,4 +19,9 @@ export class AlchemyController {
     async updateTokenPriceInDollarsController() {
         await this.alchemyService.updateTokenPriceInDollars();
     }
+
+    @Get('get-eth-balance/:address')
+    async getEthBalanceController(@Param('address') address: string) {
+        return await this.alchemyService.getEthBalance(address);
+    }
 }
