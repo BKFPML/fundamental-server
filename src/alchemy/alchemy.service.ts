@@ -201,11 +201,11 @@ export class AlchemyService {
         };
 
         try {
-            const response = await axios.post(Url, data);
-            const tokenBalanceWei = parseInt(response.data.result, 16);
-            const tokenBalance = parseFloat(tokenBalanceWei.toString()) / Math.pow(10, 18); // Convert to Ether
-            const tokenValue = tokenBalance * 2000; // Assuming the value of ETH is 2000 USD for example 
-            const tokenBalanceInUSD = {
+            let response = await axios.post(Url, data);
+            let tokenBalanceWei = parseInt(response.data.result, 16);
+            let tokenBalance = parseFloat(tokenBalanceWei.toString()) / Math.pow(10, 18); // Convert to Ether
+            let tokenValue = tokenBalance * 2000; // Assuming the value of ETH is 2000 USD for example 
+            let tokenBalanceInUSD = {
                 address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 balance: tokenBalanceWei,
                 value: tokenValue,
@@ -278,7 +278,7 @@ export class AlchemyService {
                         };
                     });
 
-                const tokenBalanceWei = this.getEthBalance(user.wallet_address);
+                let tokenBalanceWei = this.getEthBalance(user.wallet_address);
                 filteredBalances.push(tokenBalanceWei);
 
                 Logger.log(`Filtered balances: ${JSON.stringify(filteredBalances)}`);
