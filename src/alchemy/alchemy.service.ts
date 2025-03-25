@@ -279,9 +279,13 @@ export class AlchemyService {
                     });
 
                 let tokenBalanceWei = this.getEthBalance(user.wallet_address);
+            
+                Logger.log(`Token balance in Wei: ${JSON.stringify(tokenBalanceWei)}`);
+                Logger.log(`Filtered balances before: ${JSON.stringify(filteredBalances)}`);
+                // Add ETH balance to the filtered balances
                 filteredBalances.push(tokenBalanceWei);
-
-                Logger.log(`Filtered balances: ${JSON.stringify(filteredBalances)}`);
+                
+                Logger.log(`Filtered balances after: ${JSON.stringify(filteredBalances)}`);
 
                 // Update balances in the database
                 const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
