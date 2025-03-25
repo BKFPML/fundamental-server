@@ -76,14 +76,14 @@ export class AlchemyService {
                             value: parseFloat(item.value),
                             label: item.timestamp
                         }));
-    
+
                         const symbolsToUpdate = symbol === "WETH" ? ["WETH", "ETH"] : [symbol];
                         for (const sym of symbolsToUpdate) {
                             const { error: updateError } = await this.supabase
                                 .from('token_list')
                                 .update({ [i.name]: data })
                                 .eq('symbol', sym);
-    
+
                             if (updateError) {
                                 throw new Error(`Error updating token (${sym}): ${updateError.message}`);
                             }
@@ -204,7 +204,7 @@ export class AlchemyService {
             let response = await axios.post(Url, data);
             let tokenBalanceWei = parseInt(response.data.result, 16);
             let tokenBalance = parseFloat(tokenBalanceWei.toString()) / Math.pow(10, 18); // Convert to Ether
-            let tokenValue = tokenBalance * 2000; // Assuming the value of ETH is 2000 USD for example 
+            let tokenValue = tokenBalance * 2000; // Assuming the value of ETH is 2000 USD for example
             let tokenBalanceInUSD = {
                 address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 balance: tokenBalanceWei,
@@ -278,14 +278,10 @@ export class AlchemyService {
                         };
                     });
 
-                let tokenBalanceWei = this.getEthBalance(user.wallet_address);
-            
-                Logger.log(`Token balance in Wei: ${JSON.stringify(tokenBalanceWei)}`);
-                Logger.log(`Filtered balances before: ${JSON.stringify(filteredBalances)}`);
+                let tokenBalanceWei = await this.getEthBalance(user.wallet_address);
+
                 // Add ETH balance to the filtered balances
                 filteredBalances.push(tokenBalanceWei);
-                
-                Logger.log(`Filtered balances after: ${JSON.stringify(filteredBalances)}`);
 
                 // Update balances in the database
                 const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
