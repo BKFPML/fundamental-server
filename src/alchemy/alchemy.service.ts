@@ -136,7 +136,7 @@ export class AlchemyService {
 
             for (const token of tokens) {
                 Logger.log(token.symbol);
-
+                Logger.log(currentTime.getTime() - new Date(token.daily_values[-1].label).getTime());
                 if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values[-1].label).getTime() >  30 * 60 * 1000) {
                     await this.getTokenHistoricPrices(token.symbol);
                     const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
