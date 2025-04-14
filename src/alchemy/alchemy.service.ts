@@ -136,7 +136,7 @@ export class AlchemyService {
 
             for (const token of tokens) {
                 Logger.log(token.symbol);
-                
+
                 if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values[0].label).getTime() >  30 * 60 * 1000) {
                     await this.getTokenHistoricPrices(token.symbol);
                     const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
@@ -331,13 +331,13 @@ export class AlchemyService {
                 const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
                 if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
 
-                let totalValue = 0;
-                for (const balance of filteredBalances) {
-                    totalValue += balance.value;
-                }
+                // let totalValue = 0;
+                // for (const balance of filteredBalances) {
+                //     totalValue += balance.value;
+                // }
 
-                const { error: updateError2 } = await this.supabase.from('users').update({total_value_historic: user.total_value_historic.concat({value:totalValue, timestamp: new Date()}) }).eq('wallet_address', user.wallet_address);
-                if (updateError2) throw new Error(`Error updating total value: ${updateError2.message}`);
+                // const { error: updateError2 } = await this.supabase.from('users').update({total_value_historic: user.total_value_historic.concat({value:totalValue, timestamp: new Date()}) }).eq('wallet_address', user.wallet_address);
+                // if (updateError2) throw new Error(`Error updating total value: ${updateError2.message}`);
 
             } catch (error) {
                 Logger.error('Error fetching or processing token balances:', error.message);
