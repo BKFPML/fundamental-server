@@ -318,6 +318,17 @@ export class AlchemyService {
                 // Add ETH balance to the filtered balances
                 filteredBalances.push(tokenBalanceWei);
 
+                // Set at 0 all the token in acceptedTokens that are not in filteredBalances
+                for (const token of acceptedTokens) {
+                    if (!filteredBalances.some((balance: any) => balance.address.toLowerCase() === token.address.toLowerCase())) {
+                        filteredBalances.push({
+                            address: token.address,
+                            balance: 0,
+                            value: 0,
+                        });
+                    }
+                }
+
                 // Update balances in the database
                 const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
                 if (updateError) throw new Error(`Error updating balances: ${updateError.message}`);
