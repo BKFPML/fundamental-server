@@ -92,9 +92,7 @@ export class AlchemyService {
                             value: parseFloat(item.value),
                             label: item.timestamp
                         }));
-                        
-                        Logger.log("Interval: ", i.name);
-                        Logger.log("10 first values: ", data.slice(0, 10));
+
                         const symbolsToUpdate = symbol === "WETH" ? ["WETH", "ETH"] : [symbol];
                         for (const sym of symbolsToUpdate) {
                             const { error: updateError } = await this.supabase
@@ -136,25 +134,18 @@ export class AlchemyService {
 
             for (const token of tokens) {
                 Logger.log(token.symbol);
-                Logger.log(currentTime.getTime() - new Date(token.daily_values[-1].label).getTime());
-                if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values[-1].label).getTime() >  30 * 60 * 1000) {
+                Logger.log(currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime());
+                if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime() >  30 * 60 * 1000) {
                     await this.getTokenHistoricPrices(token.symbol);
                     const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
                         .from('token_list')
                         .select('daily_values, weekly_values, monthly_values, yearly_values')
                         .eq('symbol', token.symbol);
                     Logger.log("Daily values: ", token.daily_values);
-                    Logger.log("Weekly values: ", token.weekly_values);
-                    Logger.log("Monthly values: ", token.monthly_values);
-                    Logger.log("Yearly values: ", token.yearly_values);
                     token.daily_values = [{value: 0, label: 'placeholder'}].concat(daily_values.slice(0, -1));
                     token.weekly_values = [{value: 0, label: 'placeholder'}].concat(weekly_values.slice(0, -1));
                     token.monthly_values = [{value: 0, label: 'placeholder'}].concat(monthly_values.slice(0, -1));
                     token.yearly_values =  [{value: 0, label: 'placeholder'}].concat(yearly_values.slice(0, -1));
-                    Logger.log("Daily values: ", token.daily_values);
-                    Logger.log("Weekly values: ", token.weekly_values);
-                    Logger.log("Monthly values: ", token.monthly_values);
-                    Logger.log("Yearly values: ", token.yearly_values);
                 }
             }
 
