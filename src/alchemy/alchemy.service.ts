@@ -55,6 +55,7 @@ export class AlchemyService {
     */
 
     async getTokenHistoricPrices(symbol: string = "WETH"): Promise<void> {
+        Logger.log("Fetching token history for symbol: ", symbol);
         const currentTime = new Date();
         const intervals = [
             { name: "yearly_values", interval: "1d", startTime: new Date(currentTime.getTime() - 364 * 24 * 60 * 60 * 1000).toISOString(), data_keep: 3 }, // 364 / 3 = 121 value
@@ -91,7 +92,9 @@ export class AlchemyService {
                             value: parseFloat(item.value),
                             label: item.timestamp
                         }));
-
+                        
+                        Logger.log("Interval: ", i.name);
+                        Logger.log("10 first values: ", data.slice(0, 10));
                         const symbolsToUpdate = symbol === "WETH" ? ["WETH", "ETH"] : [symbol];
                         for (const sym of symbolsToUpdate) {
                             const { error: updateError } = await this.supabase
@@ -132,14 +135,18 @@ export class AlchemyService {
             const tokens = data as TokenHistoricPriceArrayWithSymbol[];
 
             for (const token of tokens) {
-                Logger.log("Token: ", token.symbol);
+                Logger.log(token.symbol);
 
-                if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values[0].label).getTime() > 20 * 60 * 1000) {
+                if (Array.isArray(token.daily_values) === false) {
                     await this.getTokenHistoricPrices(token.symbol);
                     const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
                         .from('token_list')
                         .select('daily_values, weekly_values, monthly_values, yearly_values')
                         .eq('symbol', token.symbol);
+                    Logger.log("Daily values: ", token.daily_values);
+                    Logger.log("Weekly values: ", token.weekly_values);
+                    Logger.log("Monthly values: ", token.monthly_values);
+                    Logger.log("Yearly values: ", token.yearly_values);
                     token.daily_values = [{value: 0, label: 'placeholder'}].concat(daily_values.slice(0, -1));
                     token.weekly_values = [{value: 0, label: 'placeholder'}].concat(weekly_values.slice(0, -1));
                     token.monthly_values = [{value: 0, label: 'placeholder'}].concat(monthly_values.slice(0, -1));
