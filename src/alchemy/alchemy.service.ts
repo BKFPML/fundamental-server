@@ -114,6 +114,20 @@ export class AlchemyService {
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
 
+            await tokens.forEach(async token =>  {
+                if (Array.isArray(token.daily_values) === false) {
+                    await this.getTokenHistoricPrices(token.symbol);
+                    const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
+                        .from('token_list')
+                        .select('daily_values, weekly_values, monthly_values, yearly_values')
+                        .eq('symbol', token.symbol);
+                    token.daily_values =[{}].concat(daily_values.slice(0, -1));
+                    token.weekly_values = [{}].concat(weekly_values.slice(0, -1));
+                    token.monthly_values = [{}].concat(monthly_values.slice(0, -1));
+                    token.yearly_values =  [{}].concat(yearly_values.slice(0, -1));
+                }
+            });
+
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) throw new Error('No tokens found in the database');
 
