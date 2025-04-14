@@ -115,6 +115,12 @@ export class AlchemyService {
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
 
             await tokens.forEach(async token =>  {
+                Logger.log("Token: ", token.symbol);
+                Logger.log("Daily values: ", token.daily_values);
+                Logger.log("Weekly values: ", token.weekly_values);
+                Logger.log("Monthly values: ", token.monthly_values);
+                Logger.log("Yearly values: ", token.yearly_values);
+                
                 if (Array.isArray(token.daily_values) === false) {
                     await this.getTokenHistoricPrices(token.symbol);
                     const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
