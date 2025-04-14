@@ -6,6 +6,21 @@ import { timestamp } from 'rxjs';
 import { log } from 'console';
 import { parse } from 'path';
 
+class TokenHistoricPrice {
+    value: number;
+    label: string;
+}
+
+class TokenHistoricPriceArray {
+    yearly_values: TokenHistoricPrice[];
+    monthly_values: TokenHistoricPrice[];
+    weekly_values: TokenHistoricPrice[];
+    daily_values: TokenHistoricPrice[];
+}
+
+class TokenHistoricPriceArrayWithSymbol extends TokenHistoricPriceArray {
+    symbol: string;
+}
 
 @Injectable()
 export class AlchemyService {
@@ -101,38 +116,40 @@ export class AlchemyService {
 
     public async updateTokenPriceInDollars(): Promise<void> {
         try {
-            const currentTime = new Date();
-            const nb_minutes = currentTime.getUTCMinutes();
-            const nb_hours = currentTime.getUTCHours();
-            const dayOfYear = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+            const currentTime: Date = new Date();
+            const nb_minutes: number = currentTime.getUTCMinutes();
+            const nb_hours: number = currentTime.getUTCHours();
+            const dayOfYear: number = Math.floor((currentTime.getTime() - new Date(currentTime.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
             console.log("Current minutes: ", nb_minutes);
             console.log("Current hours: ", nb_hours);
             console.log("Current day of year: ", dayOfYear);
 
-            const { data: tokens, error } = await this.supabase
+            const { data, error } = await this.supabase
                 .from('token_list')
                 .select('symbol, daily_values, weekly_values, monthly_values, yearly_values');
 
-            await tokens.forEach(async token =>  {
+            const tokens = data as TokenHistoricPriceArrayWithSymbol[];
+
+            for (const token of tokens) {
                 Logger.log("Token: ", token.symbol);
-                Logger.log("Daily values: ", token.daily_values);
-                Logger.log("Weekly values: ", token.weekly_values);
-                Logger.log("Monthly values: ", token.monthly_values);
-                Logger.log("Yearly values: ", token.yearly_values);
-                
-                if (Array.isArray(token.daily_values) === false) {
+
+                if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values[0].label).getTime() > 20 * 60 * 1000) {
                     await this.getTokenHistoricPrices(token.symbol);
                     const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
                         .from('token_list')
                         .select('daily_values, weekly_values, monthly_values, yearly_values')
                         .eq('symbol', token.symbol);
-                    token.daily_values =[{}].concat(daily_values.slice(0, -1));
-                    token.weekly_values = [{}].concat(weekly_values.slice(0, -1));
-                    token.monthly_values = [{}].concat(monthly_values.slice(0, -1));
-                    token.yearly_values =  [{}].concat(yearly_values.slice(0, -1));
+                    token.daily_values = [{value: 0, label: 'placeholder'}].concat(daily_values.slice(0, -1));
+                    token.weekly_values = [{value: 0, label: 'placeholder'}].concat(weekly_values.slice(0, -1));
+                    token.monthly_values = [{value: 0, label: 'placeholder'}].concat(monthly_values.slice(0, -1));
+                    token.yearly_values =  [{value: 0, label: 'placeholder'}].concat(yearly_values.slice(0, -1));
+                    Logger.log("Daily values: ", token.daily_values);
+                    Logger.log("Weekly values: ", token.weekly_values);
+                    Logger.log("Monthly values: ", token.monthly_values);
+                    Logger.log("Yearly values: ", token.yearly_values);
                 }
-            });
+            }
 
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
             if (!tokens || tokens.length === 0) throw new Error('No tokens found in the database');
@@ -164,7 +181,7 @@ export class AlchemyService {
                 const token = tokens.find(t => t.symbol === tokenData.symbol);
                 if (!token) throw new Error(`Token not found in the database: ${tokenData.symbol}`);
 
-                const updates: any = { last_value: tokenData.prices[0].value };
+                const updates:any = { last_value: tokenData.prices[0].value };
 
                 // Update Yearly values every 3 days
                 if (dayOfYear % 3 && nb_hours === 0 && nb_minutes === 0) {
