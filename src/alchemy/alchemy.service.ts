@@ -282,7 +282,14 @@ export class AlchemyService {
 
             try {
                 // Fetch balances from Alchemy
-                const response = await axios.post(url, data);
+                let response;
+                try {
+                    response = await axios.post(url, data);
+                } catch (err) {
+                    Logger.error('Alchemy API failed:', err.response?.data || err.message);
+                    throw new Error('Alchemy API call failed');
+                }
+
                 console.log(response.data);
                 if (!response.data.result) throw new Error('No result found in the response');
                 const balances = response.data.result.tokenBalances;
