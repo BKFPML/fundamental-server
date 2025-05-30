@@ -2,9 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
-import { timestamp } from 'rxjs';
-import { log } from 'console';
-import { parse } from 'path';
 
 class TokenHistoricPrice {
     value: number;
