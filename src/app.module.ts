@@ -7,6 +7,7 @@ import { AlchemyModule } from './alchemy/alchemy.module';
 import { FrankfurterService } from './frankfurter/frankfurter.service';
 import { FrankfurterModule } from './frankfurter/frankfurter.module';
 import { EthersModule } from './ethers/ethers.module';
+import { EtherscanModule } from './etherscan/etherscan.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { EthersModule } from './ethers/ethers.module';
     AlchemyModule,
     FrankfurterModule,
     EthersModule,
+    EtherscanModule,
   ],
   controllers: [AppController],
   providers: [AppService, FrankfurterService],

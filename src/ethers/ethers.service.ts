@@ -3,11 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   Wallet,
   JsonRpcProvider,
-  Mnemonic,
-  HDNodeWallet,
-  formatEther,
-  parseEther,
-  parseUnits
+  parseEther
 } from "ethers";
 import { createClient } from '@supabase/supabase-js';
 
@@ -30,6 +26,16 @@ export class EthersService {
             this.rpcUrl = this.configService.get<string>('BASE_RPC_URL');
         }
 
+    /**
+     * Ajoute des fonds à un portefeuille Ethereum si son solde est inférieur à 0.05 cents d'ETH.
+     * @param address L'adresse du portefeuille à alimenter.
+     * @returns Une promesse qui se résout lorsque les fonds sont ajoutés.
+     * @throws Une erreur si l'adresse n'est pas trouvée dans la base de données ou si une erreur se produit lors de la récupération des données.
+     * @throws Une erreur si le token ETH n'est pas trouvé dans la base de données.
+     * @throws Une erreur si le portefeuille a déjà suffisamment de fonds.
+     * @throws Une erreur si une erreur se produit lors de l'envoi de la transaction.
+     * @description Cette méthode vérifie si le portefeuille a moins de 0.01 cents d'ETH. Si c'est le cas, elle envoie environ 0.05 € d'ETH à l'adresse spécifiée.
+    */
     async addFeesMoneyToWallet(address: string): Promise<void> {
         // Vérification si l'adresse est dans la base de données et quelle possède moins de 0.01 cents of ETH
         let needsFunding = false;
