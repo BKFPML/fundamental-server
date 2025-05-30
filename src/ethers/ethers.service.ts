@@ -25,7 +25,8 @@ export class EthersService {
             this.supabaseUrl = this.configService.get<string>('SUPABASE_URL'); // Récupération de l'URL Supabase
             this.supabaseKey = this.configService.get<string>('SUPABASE_KEY'); // Récupération de la clé Supabase
             this.supabase = createClient(this.supabaseUrl, this.supabaseKey); // Création du client Supabase
-            this.hotWalletPrivateKey = this.configService.get<string>('HOT_WALLET_PRIVATE_KEY');
+            const pk = this.configService.get<string>('HOT_WALLET_PRIVATE_KEY');
+            this.hotWalletPrivateKey = pk.startsWith('0x') ? pk : '0x' + pk;
             this.rpcUrl = this.configService.get<string>('BASE_RPC_URL');
         }
 
@@ -72,6 +73,8 @@ export class EthersService {
             console.log(`Wallet ${address} already has sufficient funds.`);
             return;
         }
+        console.log(`Hot wallet PK starts with: ${this.hotWalletPrivateKey.slice(0, 12)}`);
+        console.log('rpcUrl starts with: ' + this.rpcUrl.slice(0, 12));
 
         const provider = new JsonRpcProvider(this.rpcUrl);
         const hotWallet = new Wallet(this.hotWalletPrivateKey, provider);
