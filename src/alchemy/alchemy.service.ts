@@ -112,6 +112,20 @@ export class AlchemyService {
         }
     }
 
+    private async updateTokenHistoricPrices(token: TokenHistoricPriceArrayWithSymbol): Promise<TokenHistoricPriceArrayWithSymbol> {
+        await this.getTokenHistoricPrices(token.symbol);
+        const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
+            .from('token_list')
+            .select('daily_values, weekly_values, monthly_values, yearly_values')
+            .eq('symbol', token.symbol);
+        Logger.log("Daily values: ", token.daily_values);
+        token.daily_values = [{value: 0, label: 'placeholder'}].concat(daily_values.slice(0, -1));
+        token.weekly_values = [{value: 0, label: 'placeholder'}].concat(weekly_values.slice(0, -1));
+        token.monthly_values = [{value: 0, label: 'placeholder'}].concat(monthly_values.slice(0, -1));
+        token.yearly_values =  [{value: 0, label: 'placeholder'}].concat(yearly_values.slice(0, -1));
+        return token;
+    }
+
     public async updateTokenPriceInDollars(): Promise<void> {
         try {
             const currentTime: Date = new Date();
@@ -129,21 +143,14 @@ export class AlchemyService {
 
             const tokens = data as TokenHistoricPriceArrayWithSymbol[];
 
-            for (const token of tokens) {
+            for (let token of tokens) {
+                if (Array.isArray(token.daily_values) === false) {
+                    token = await this.updateTokenHistoricPrices(token);
+                } else if (currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime() >  30 * 60 * 1000) {
+                    token = await this.updateTokenHistoricPrices(token);
+                }
                 Logger.log(token.symbol);
                 Logger.log(currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime());
-                if (Array.isArray(token.daily_values) === false || currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime() >  30 * 60 * 1000) {
-                    await this.getTokenHistoricPrices(token.symbol);
-                    const {daily_values, weekly_values, monthly_values, yearly_values} = await this.supabase
-                        .from('token_list')
-                        .select('daily_values, weekly_values, monthly_values, yearly_values')
-                        .eq('symbol', token.symbol);
-                    Logger.log("Daily values: ", token.daily_values);
-                    token.daily_values = [{value: 0, label: 'placeholder'}].concat(daily_values.slice(0, -1));
-                    token.weekly_values = [{value: 0, label: 'placeholder'}].concat(weekly_values.slice(0, -1));
-                    token.monthly_values = [{value: 0, label: 'placeholder'}].concat(monthly_values.slice(0, -1));
-                    token.yearly_values =  [{value: 0, label: 'placeholder'}].concat(yearly_values.slice(0, -1));
-                }
             }
 
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
