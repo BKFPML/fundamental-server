@@ -149,8 +149,6 @@ export class AlchemyService {
                 } else if (currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime() >  30 * 60 * 1000) {
                     token = await this.updateTokenHistoricPrices(token);
                 }
-                Logger.log(token.symbol);
-                Logger.log(currentTime.getTime() - new Date(token.daily_values.slice(-1)[0].label).getTime());
             }
 
             if (error) throw new Error(`Error fetching tokens: ${error.message}`);
