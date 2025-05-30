@@ -33,7 +33,7 @@ export class EtherscanService {
     const res = await axios.get(url);
 
     if (res.data.status !== '1') {
-      throw new Error(`API error: ${res.data.message}`);
+      return;
     }
 
     const allTokenTxs = res.data.result;
@@ -91,6 +91,7 @@ export class EtherscanService {
     if (error_user) {
       throw new Error(`Error fetching wallet: ${error_user.message}`);
     }
+
     if (!user || user.length === 0) {
       throw new Error('No wallets found in the database.');
     }
