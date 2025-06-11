@@ -38,7 +38,7 @@ export class EthersService {
     */
     async addFeesMoneyToWallet(address: string): Promise<void> {
         // Vérification si l'adresse est dans la base de données et quelle possède moins de 0.01 cents of ETH
-        let needsFunding = false;
+        // let needsFunding = false;
         const { data: tokens, error: error_token } = await this.supabase
             .from('token_list')
             .select('last_value')
@@ -56,29 +56,44 @@ export class EthersService {
 
         const { data: user, error: error_user } = await this.supabase
             .from('users')
-            .select('balances')
+            .select('balances, gas_sponsored')
             .eq('wallet_address', address);
 
         // check if there is an error
         if (error_user) {
+            console.log(`Error fetching wallet: ${error_user.message}`);
             throw new Error(`Error fetching wallet: ${error_user.message}`);
         } else if (!user) {
+            console.log(`Wallet with address ${address} not found in the database.`);
             throw new Error(`Wallet with address ${address} not found in the database.`);
         }
         // Check if the balance is less than 0.01 ETH
-        user[0].balances.map((balance: any) => {
-            if (balance.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
-                if (balance.value < 0.01) {
-                    needsFunding = true;
-                }
-            }
-        });
+        // user[0].balances.map((balance: any) => {
+        //     if (balance.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
+        //         if (balance.value < 0.01) {
+        //             needsFunding = true;
+        //         }
+        //     }
+        // });
 
         // If the wallet already has sufficient funds, we do not need to fund it
-        if (!needsFunding) {
-            console.log(`Wallet ${address} already has sufficient funds.`);
+        // if (!needsFunding) {
+        //     console.log(`Wallet ${address} already has sufficient funds.`);
+        //     return;
+        // }
+
+        // Check if the balance already gets sponsored
+        if (user[0].gas_sponsored) {
+            console.log(`Wallet ${address} already has gas sponsored.`);
             return;
         }
+
+        await this.supabase
+            .from('users')
+            .update({ gas_sponsored: true })
+            .eq('wallet_address', address);
+        console.log(`Wallet ${address} has been marked as gas sponsored.`);
+
         console.log(`Hot wallet PK starts with: ${this.hotWalletPrivateKey.slice(0, 12)}`);
         console.log('rpcUrl starts with: ' + this.rpcUrl.slice(0, 12));
 
