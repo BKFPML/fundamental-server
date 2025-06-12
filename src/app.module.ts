@@ -8,6 +8,7 @@ import { FrankfurterService } from './frankfurter/frankfurter.service';
 import { FrankfurterModule } from './frankfurter/frankfurter.module';
 import { EthersModule } from './ethers/ethers.module';
 import { EtherscanModule } from './etherscan/etherscan.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { EtherscanModule } from './etherscan/etherscan.module';
     FrankfurterModule,
     EthersModule,
     EtherscanModule,
+    DatabaseModule,
   ],
   controllers: [AppController],
   providers: [AppService, FrankfurterService],
