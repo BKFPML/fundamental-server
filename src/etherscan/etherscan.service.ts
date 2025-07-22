@@ -3,6 +3,7 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
 import { Logger } from '@nestjs/common';
+import { Status } from '../../template/type'
 
 @Injectable()
 export class EtherscanService {
@@ -28,12 +29,12 @@ export class EtherscanService {
    * @param address L'adresse Ethereum à interroger.
    * @returns Une promesse contenant la liste des transactions.
    */
-  public async updateWalletTransactions(address: string) {
+  public async updateWalletTransactions(address: string): Promise<Status> {
     const url = `${this.apiUrl}?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&sort=asc&apikey=${this.apiKey}`;
     const res = await axios.get(url);
 
     if (res.data.status !== '1') {
-      return;
+      return { exitCode: 500, message: 'Erreur lors de la récupération des transactions: ' + res.data.message};
     }
 
     const allTokenTxs = res.data.result;
@@ -43,7 +44,7 @@ export class EtherscanService {
       .select('address');
 
     if (error || !tokens) {
-      throw new Error('Erreur Supabase lors de la récupération des tokens');
+      return { exitCode: 500, message: 'Erreur lors de la récupération des tokens: ' + (error ? error.message : 'No tokens found') };
     }
 
     const whitelist = tokens.map(t => t.address.toLowerCase());
@@ -68,9 +69,9 @@ export class EtherscanService {
       .upsert(toInsert, { onConflict: ['id'] }); // évite doublons
 
     if (insertError) {
-      throw new Error('Erreur lors de l\'insertion dans Supabase: ' + insertError.message);
+      return { exitCode: 500, message: 'Erreur lors de l\'insertion dans Supabase: ' + insertError.message };
     }
-    return;
+    return {exitCode: 200, message: 'Wallet Transaction updated successfully'};
   }
 
   private sleep(ms: number) {
@@ -83,17 +84,17 @@ export class EtherscanService {
    * @returns Une promesse qui se résout lorsque les transactions sont mises à jour.
    */
 
-  public async updateAllWalletTransactions(): Promise<void> {
+  public async updateAllWalletTransactions(): Promise<Status> {
     const { data: user, error: error_user } = await this.supabase
       .from('users')
       .select('wallet_address');
 
     if (error_user) {
-      throw new Error(`Error fetching wallet: ${error_user.message}`);
+      return { exitCode: 500, message: 'Erreur lors de la récupération des utilisateurs: ' + error_user.message };
     }
 
     if (!user || user.length === 0) {
-      throw new Error('No wallets found in the database.');
+      return { exitCode: 404, message: 'Aucun utilisateur trouvé' };
     }
 
     const addresses = user.map(u => u.wallet_address);
@@ -105,7 +106,6 @@ export class EtherscanService {
       }
     }
 
-    Logger.log('All wallet transactions updated successfully.');
-    return;
+    return { exitCode: 200, message: 'All wallet transactions updated successfully.' };
   }
 }

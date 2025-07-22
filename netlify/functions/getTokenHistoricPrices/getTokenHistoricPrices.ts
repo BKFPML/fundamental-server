@@ -15,10 +15,10 @@ export const handler: Handler = async (event) => {
         };
     }
 
-    await alchemyService.getTokenHistoricPrices(symbol);
+    const status = await alchemyService.getTokenHistoricPrices(symbol);
     
     return {
-        statusCode: 200,
-        body: JSON.stringify({ message: 'Token ${symbol} historic prices updated' }),
+        statusCode: status.exitCode,
+        body: JSON.stringify({ message: status.message }),
     };
 };

@@ -5,24 +5,15 @@ import { AlchemyService } from '../../src/alchemy/alchemy.service';
 const alchemyService = new AlchemyService(new ConfigService());
 
 export default async (req: Request) => {
-    try {
-        const { next_run } = await req.json();
-        console.log("Received event! Next invocation at:", next_run);
+    const { next_run } = await req.json();
+    console.log("Received event! Next invocation at:", next_run);
 
-        await alchemyService.updateTokenBalances();
+    const status = await alchemyService.updateTokenBalances();
 
-        return new Response(
-            JSON.stringify({ message: "Token balances updated successfully"}),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-
-    } catch (error) {
-        console.error('Error processing request:', error.message);
-        return new Response(
-            JSON.stringify({ error: 'Internal Server Error' }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-        );
-    }
+    return new Response(
+        JSON.stringify({ message: status.message }),
+        { status: status.exitCode, headers: { 'Content-Type': 'application/json' } }
+    );
 };
 
 export const config: Config = {

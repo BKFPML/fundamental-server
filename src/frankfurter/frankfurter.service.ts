@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
+import { Status } from '../../template/type';
 
 @Injectable()
 export class FrankfurterService {
@@ -59,28 +60,25 @@ export class FrankfurterService {
         );
     }
 
-    public async getCurrenciesHistoricPrice(symbol: string): Promise<void> {
-        try {
-            const { startDate, endDate } = this.getDateRange();
-            const url = `https://api.frankfurter.dev/v1/${endDate}..${startDate}?base=USD&symbols=${symbol}`;
+    public async getCurrenciesHistoricPrice(symbol: string): Promise<Status> {
+        const { startDate, endDate } = this.getDateRange();
+        const url = `https://api.frankfurter.dev/v1/${endDate}..${startDate}?base=USD&symbols=${symbol}`;
 
-            const { data } = await axios.get(url, { headers: { Accept: 'application/json' } });
-            if (!data?.rates) throw new Error('Invalid API response: No rates data');
+        const { data } = await axios.get(url, { headers: { Accept: 'application/json' } });
+        if (!data?.rates) return { exitCode: 500, message: 'Erreur lors de la récupération des taux de change' };
 
-            const filledRates = this.fillMissingData(data.rates, endDate, startDate);
-            const formattedRates = this.formatRates(filledRates);
-            Logger.log(formattedRates);
-            const { error } = await this.supabase.from('exchange_rate').update({ value: formattedRates }).eq('symbol', symbol);
-            if (error) throw new Error(`Error updating exchange rates: ${error.message}`);
-        } catch (error) {
-            Logger.error(`Error fetching or updating currency prices: ${error.message}`);
-            throw error;
-        }
+        const filledRates = this.fillMissingData(data.rates, endDate, startDate);
+        const formattedRates = this.formatRates(filledRates);
+
+        const { error } = await this.supabase.from('exchange_rate').update({ value: formattedRates }).eq('symbol', symbol);
+        if (error) return { exitCode: 500, message: 'Erreur lors de la mise à jour des taux de change: ' + error.message };
+
+        return { exitCode: 200, message: 'Historique des prix récupéré avec succès' };
     }
 
-    public async updateCurrencyPrice(): Promise<void> {
+    public async updateCurrencyPrice(): Promise<Status> {
         const {data: currencies, error} = await this.supabase.from('exchange_rate').select('symbol, value');
-        if (error) throw new Error(`Error fetching currencies: ${error.message}`);
+        if (error) return { exitCode: 500, message: 'Erreur lors de la récupération des devises: ' + error.message };
 
         let url = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=';
         for (const currency of currencies) {
@@ -89,14 +87,15 @@ export class FrankfurterService {
         }
 
         const { data } = await axios.get(url, { headers: { Accept: 'application/json' } });
-        if (!data?.rates) throw new Error('Invalid API response: No rates data');
+        if (!data?.rates) return { exitCode: 500, message: 'Erreur lors de la récupération des taux de change' };
 
         for (const currency of currencies) {
             const rate = data.rates[currency.symbol];
             if (!rate) continue;
 
             const { error } = await this.supabase.from('exchange_rate').update({ value: currency.value.slice(1).concat({ value: rate, timestamp: new Date().toISOString().split('T')[0]})}).eq('symbol', currency.symbol);
-            if (error) throw new Error(`Error updating exchange rates: ${error.message}`);
+            if (error) return { exitCode: 500, message: 'Erreur lors de la mise à jour des taux de change: ' + error.message };
         }
+        return { exitCode: 200, message: 'Taux de change mis à jour avec succès' };
     }
 }

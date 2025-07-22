@@ -6,6 +6,7 @@ import {
   parseEther
 } from "ethers";
 import { createClient } from '@supabase/supabase-js';
+import { Status } from '../../template/type'
 
 @Injectable()
 export class EthersService {
@@ -36,7 +37,7 @@ export class EthersService {
      * @throws Une erreur si une erreur se produit lors de l'envoi de la transaction.
      * @description Cette méthode vérifie si le portefeuille a moins de 0.01 cents d'ETH. Si c'est le cas, elle envoie environ 0.05 € d'ETH à l'adresse spécifiée.
     */
-    async addFeesMoneyToWallet(address: string): Promise<void> {
+    async addFeesMoneyToWallet(address: string): Promise<Status> {
         // Vérification si l'adresse est dans la base de données et quelle possède moins de 0.01 cents of ETH
         // let needsFunding = false;
         const { data: tokens, error: error_token } = await this.supabase
@@ -45,13 +46,11 @@ export class EthersService {
             .eq('address', '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'); // Adresse du token ETH
 
         if (error_token) {
-            throw new Error(`Error fetching token: ${error_token.message}`);
+            return { exitCode: 500, message: 'Erreur lors de la récupération du token ETH: ' + error_token.message };
         }
 
         if (!tokens || !tokens[0].last_value) {
-            throw new Error(
-                `Token with address 0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee not found in the database.`
-            );
+            return { exitCode: 500, message: 'Token ETH non trouvé dans la base de données' };
         }
 
         const { data: user, error: error_user } = await this.supabase
@@ -60,13 +59,9 @@ export class EthersService {
             .eq('wallet_address', address);
 
         // check if there is an error
-        if (error_user) {
-            console.log(`Error fetching wallet: ${error_user.message}`);
-            throw new Error(`Error fetching wallet: ${error_user.message}`);
-        } else if (!user) {
-            console.log(`Wallet with address ${address} not found in the database.`);
-            throw new Error(`Wallet with address ${address} not found in the database.`);
-        }
+        if (error_user) return { exitCode: 500, message: 'Erreur lors de la récupération de l\'utilisateur: ' + error_user.message };
+        else if (!user) return { exitCode: 404, message: 'Utilisateur non trouvé' };
+        
         // Check if the balance is less than 0.01 ETH
         // user[0].balances.map((balance: any) => {
         //     if (balance.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
@@ -85,15 +80,17 @@ export class EthersService {
         // Check if the balance already gets sponsored
         if (user[0].gas_sponsored) {
             console.log(`Wallet ${address} already has gas sponsored.`);
-            return;
+            return { exitCode: 201, message: `Wallet ${address} already has gas sponsored.` };
         }
 
-        await this.supabase
+        const { error: error_update } = await this.supabase
             .from('users')
             .update({ gas_sponsored: true })
             .eq('wallet_address', address);
-        console.log(`Wallet ${address} has been marked as gas sponsored.`);
 
+        if (error_update) return { exitCode: 500, message: 'Erreur lors de la mise à jour de l\'utilisateur: ' + error_update.message };
+
+        console.log(`Wallet ${address} has been marked as gas sponsored.`);
         console.log(`Hot wallet PK starts with: ${this.hotWalletPrivateKey.slice(0, 12)}`);
         console.log('rpcUrl starts with: ' + this.rpcUrl.slice(0, 12));
 
@@ -111,5 +108,10 @@ export class EthersService {
 
         await tx.wait();
         console.log(`✅ Envoyé ${amountInEth} ETH à ${address} : ${tx.hash}`);
+        if (!tx.hash) {
+            return { exitCode: 500, message: 'Erreur lors de l\'envoi de la transaction' };
+        }
+
+        return { exitCode: 200, message: `Fonds ajoutés avec succès à l'adresse ${address}` };
     }
 }

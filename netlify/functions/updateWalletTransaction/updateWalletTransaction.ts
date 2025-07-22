@@ -17,11 +17,11 @@ export const handler: Handler = async (event) => {
     }
 
     // Appel de la méthode updateTokenBalances de AlchemyService pour récupérer les données de l'adresse fournie
-    await ethersService.updateWalletTransactions(address);
+    const status = await ethersService.updateWalletTransactions(address);
 
     // Retourner les données récupérées au format JSON
     return {
-        statusCode: 200,
-        body: JSON.stringify({ "message": "Token balances updated successfully" }),
+        statusCode: status.exitCode,
+        body: JSON.stringify({ "message": status.message }),
     };
 };

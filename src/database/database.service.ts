@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
+import { Status } from '../../template/type';
 @Injectable()
 export class DatabaseService {
     private readonly supabaseUrl: string;
@@ -25,7 +26,7 @@ export class DatabaseService {
         // this.supabaseBackup = createClient(this.supabaseUrl, this.supabaseKey); // Création du client Supabase
     }
 
-    async saveCurrentProductionDatabaseToDevelopment(): Promise<void> {
+    async saveCurrentProductionDatabaseToDevelopment(): Promise<Status> {
         const tables = [
             { name: 'users', conflictKey: 'id' },
             { name: 'user_feedback', conflictKey: 'id' },
@@ -43,7 +44,7 @@ export class DatabaseService {
 
 
             if (deleteError) {
-                throw new Error(`Error deleting ${table.name} from development: ${deleteError.message}`);
+                return { exitCode: 500, message: `Error deleting ${table.name} from development: ${deleteError.message}` };
             }
 
             // 2. Récupérer les données de production
@@ -52,7 +53,7 @@ export class DatabaseService {
                 .select('*');
 
             if (fetchError) {
-                throw new Error(`Error fetching ${table.name} from production: ${fetchError.message}`);
+                return { exitCode: 500, message: `Error fetching ${table.name} from production: ${fetchError.message}` };
             }
 
             // 3. Réinsérer les données dans dev
@@ -63,9 +64,10 @@ export class DatabaseService {
                 });
 
             if (upsertError) {
-                throw new Error(`Error inserting ${table.name} into development: ${upsertError.message}`);
+                return { exitCode: 500, message: `Error inserting ${table.name} into development: ${upsertError.message}` };
             }
         }
+        return { exitCode: 200, message: 'Database successfully updated from production to development' };
     }
 
 

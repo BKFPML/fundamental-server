@@ -16,10 +16,10 @@ export const handler: Handler = async (event) => {
         };
     }
 
-    await ethersService.addFeesMoneyToWallet(address);
+    const status = await ethersService.addFeesMoneyToWallet(address);
 
     return {
-        statusCode: 200,
-        body: JSON.stringify({ "message": "Fees money added to wallet successfully" }),
+        statusCode: status.exitCode,
+        body: JSON.stringify({ "message": status.message }),
     };
 };

@@ -16,10 +16,10 @@ export const handler: Handler = async (event) => {
         };
     }
 
-    await frankfurterService.getCurrenciesHistoricPrice(symbol);
+    const status = await frankfurterService.getCurrenciesHistoricPrice(symbol);
 
     return {
-        statusCode: 200,
-        body: JSON.stringify({ "message": "Currencies prices updated successfully" }),
+        statusCode: status.exitCode,
+        body: JSON.stringify({ "message": status.message }),
     };
 };
