@@ -338,13 +338,27 @@ export class AlchemyService {
             const { error: updateError } = await this.supabase.from('users').update({ balances: filteredBalances }).eq('wallet_address', user.wallet_address);
             if (updateError) return { exitCode: 500, message: `Error updating balances: ${updateError.message}` };
 
-            // let totalValue = 0;
-            // for (const balance of filteredBalances) {
-            //     totalValue += balance.value;
-            // }
+            let totalValue = 0;
+            for (const balance of filteredBalances) {
+                totalValue += balance.value;
+            }
 
-            // const { error: updateError2 } = await this.supabase.from('users').update({total_value_historic: user.total_value_historic.concat({value:totalValue, timestamp: new Date()}) }).eq('wallet_address', user.wallet_address);
-            // if (updateError2) throw new Error(`Error updating total value: ${updateError2.message}`);
+            let totalValueHistoric = user.total_value_historic || [];
+            if (totalValueHistoric.length < 168) {
+                totalValueHistoric = [];
+                for (let i = 168; i > 0; i--) {
+                    totalValueHistoric.push({ value: 0, timestamp: new Date(Date.now() - (i * 60 * 60 * 1000)).toISOString() });
+                }
+            }
+
+            totalValueHistoric.slice();
+            totalValueHistoric.push({ value: totalValue, timestamp: new Date().toISOString() });
+            // Update total value historic in the database
+            const { error: updateError2 } = await this.supabase
+                .from('users')
+                .update({ total_value_historic: totalValueHistoric })
+                .eq('wallet_address', user.wallet_address);
+            if (updateError2) return { exitCode: 500, message: `Error updating total value: ${updateError2.message}` };
         }
         return { exitCode: 200, message: 'Token balances updated successfully' };
     }
