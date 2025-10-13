@@ -351,8 +351,12 @@ export class AlchemyService {
                 }
             }
 
-            totalValueHistoric.slice();
             totalValueHistoric.push({ value: totalValue, timestamp: new Date().toISOString() });
+            totalValueHistoric = totalValueHistoric.slice(-168);
+
+            if (totalValueHistoric.length > 168) {
+                totalValueHistoric.shift(); // Remove the oldest entry to maintain a length of 168
+            }
             // Update total value historic in the database
             const { error: updateError2 } = await this.supabase
                 .from('users')
