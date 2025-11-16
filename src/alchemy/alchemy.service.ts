@@ -139,6 +139,7 @@ export class AlchemyService {
         if (error) return { exitCode: 500, message: 'Error fetching tokens: ' + error.message };
         const tokens = data as TokenHistoricPriceArrayWithSymbol[];
 
+        console.log("Tokens fetched: ", tokens.length);
         for (let token of tokens) {
             const res = await this.updateTokenHistoricPrices(token);
             if ('status' in res) {
@@ -153,7 +154,7 @@ export class AlchemyService {
             // }
         }
         if (!tokens || tokens.length === 0) return { exitCode: 404, message: 'No tokens found in the database' };
-
+        console.log("Tokens after updating historic prices: ", tokens.length);
         const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&'); // Create query string
         const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`; // Create URL
 
@@ -164,7 +165,7 @@ export class AlchemyService {
                 Accept: 'application/json',
             },
         });
-
+        console.log("Response from Alchemy: ");
         if (!response.data.data) return { exitCode: 500, message: 'No data found in the response' };
         if (response.data.data.length === 0) return { exitCode: 404, message: 'No tokens found in the response' };
         if (response.data.errors) return { exitCode: 500, message: `Error in response: ${response.data.errors.map((error: any) => error.message).join(', ')}` };
@@ -181,7 +182,7 @@ export class AlchemyService {
             const token = tokens.find(t => t.symbol === tokenData.symbol);
             if (!token) return { exitCode: 404, message: `Token not found in the database: ${tokenData.symbol}` };
 
-            const updates:any = { last_value: tokenData.prices[0].value };
+            const updates:any = { last_value: parseFloat(tokenData.prices[0].value)};
 
             // Update Yearly values every 3 days
             if (dayOfYear % 3 && nb_hours === 0 && nb_minutes === 0) {
@@ -212,7 +213,10 @@ export class AlchemyService {
             updatedDailyValues.shift();
             updatedDailyValues.push({ ...tokenData.prices[0] });
             updates.daily_values = updatedDailyValues;
-
+            
+            // Log updates
+            console.log(`Updating token ${tokenData.symbol} with values:`);
+            console.log(updates);
             // Update token in the database
             let { error: updateError } = await this.supabase
                 .from('token_list')
