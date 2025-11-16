@@ -154,7 +154,6 @@ export class AlchemyService {
             // }
         }
         if (!tokens || tokens.length === 0) return { exitCode: 404, message: 'No tokens found in the database' };
-        console.log("Tokens after updating historic prices: ", tokens.length);
         const symbolsQuery = tokens.map(token => `symbols=${token.symbol}`).join('&'); // Create query string
         const url = `https://api.g.alchemy.com/prices/v2/${this.apiKey}/tokens/by-symbol?${symbolsQuery}`; // Create URL
 
@@ -178,10 +177,10 @@ export class AlchemyService {
                 value: parseFloat(price.value),
                 label: price.lastUpdatedAt
             }));
-
+            console.log(tokenData);
             const token = tokens.find(t => t.symbol === tokenData.symbol);
             if (!token) return { exitCode: 404, message: `Token not found in the database: ${tokenData.symbol}` };
-
+            console.log(tokenData);
             const updates:any = { last_value: parseFloat(tokenData.prices[0].value)};
 
             // Update Yearly values every 3 days
@@ -216,13 +215,13 @@ export class AlchemyService {
             
             // Log updates
             console.log(`Updating token ${tokenData.symbol} with values:`);
-            console.log(updates);
+            console.log(updates.last_value);
             // Update token in the database
             let { error: updateError } = await this.supabase
                 .from('token_list')
                 .update(updates)
                 .eq('symbol', tokenData.symbol);
-
+            console.log(`Update error for token ${tokenData.symbol}: `, updateError);
             if (updateError) return { exitCode: 500, message: `Error updating token ${tokenData.symbol}: ${updateError.message}` };
         }
         return { exitCode: 200, message: 'Token prices updated successfully' };
