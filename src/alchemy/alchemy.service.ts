@@ -61,11 +61,12 @@ export class AlchemyService {
                     interval: i.interval,
                 }),
             };
-
+            console.log("Fetching data with options: ", options);
             await fetch(`https://api.g.alchemy.com/prices/v1/${this.apiKey}/tokens/historical`, options)
                 .then(async (res) => {
                     if (!res.ok) {
                         const errorText = await res.text();
+                        console.error(`Error fetching token history for ${symbol}: ${errorText}`);
                         return { exitCode: 500, message: `Error fetching token history for ${symbol}: ${errorText}` };
                     }
                     return res.json();
@@ -87,18 +88,22 @@ export class AlchemyService {
                                 .eq('symbol', sym);
 
                             if (updateError) {
+                                console.error(`Error updating token (${sym}): ${updateError.message}`);
                                 return { exitCode: 500, message: `Error updating token (${sym}): ${updateError.message}` };
                             }
                         }
                     } else {
+                        console.error(`No data found for symbol ${symbol} in interval ${i.name}`);
                         return { exitCode: 500, message: `No data found for symbol ${symbol} in interval ${i.name}` };
                     }
                 })
                 .catch((err) => {
+                    console.error(`Error fetching token history for ${symbol}:`, err);
                     return { exitCode: 500, message: `Error fetching token history for ${symbol}: ${err.message}` };
                 });
             await this.delay(1000);
         }
+        console.log("Finished updating token historical prices");
         return {exitCode: 200, message: 'Token historical prices updated successfully'};
     }
 
@@ -110,12 +115,12 @@ export class AlchemyService {
             .from('token_list')
             .select('daily_values, weekly_values, monthly_values, yearly_values')
             .eq('symbol', token.symbol);
-
+        console.log("Fetched updated token data: ");
         if (error) return { status: { exitCode: 500, message: `Error fetching token historic prices: ${error.message}` } };
         if (!data || data.length === 0) return { status: { exitCode: 404, message: `Token ${token.symbol} not found` } };
 
+        console.log("Token historic prices data: ", data);
         const { daily_values, weekly_values, monthly_values, yearly_values } = data[0];
-        Logger.log("Daily values: ", token.daily_values);
         token.daily_values = [{value: 0, label: 'placeholder'}].concat(daily_values.slice(0, -1));
         token.weekly_values = [{value: 0, label: 'placeholder'}].concat(weekly_values.slice(0, -1));
         token.monthly_values = [{value: 0, label: 'placeholder'}].concat(monthly_values.slice(0, -1));
@@ -184,7 +189,7 @@ export class AlchemyService {
             const updates:any = { last_value: parseFloat(tokenData.prices[0].value)};
 
             // Update Yearly values every 3 days
-            if (dayOfYear % 3 && nb_hours === 0 && nb_minutes === 0) {
+            if (dayOfYear % 3 === 0 && nb_hours === 0 && nb_minutes === 0) {
                 const updatedYearlyValues = [...token.yearly_values];
                 updatedYearlyValues.shift();
                 updatedYearlyValues.push({ ...tokenData.prices[0] });
