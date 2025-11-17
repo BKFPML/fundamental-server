@@ -24,4 +24,9 @@ export class AlchemyController {
     async getEthBalanceController(@Param('address') address: string) {
         return await this.alchemyService.getEthBalance(address);
     }
+
+    @Get('refresh-next-token-historic-data/')
+    async refreshNextTokenHistoricDataController() {
+        return await this.alchemyService.refreshNextTokenHistoricData();
+    }
 }
